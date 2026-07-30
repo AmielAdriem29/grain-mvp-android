@@ -51,4 +51,8 @@ dependencies {
     implementation("androidx.camera:camera-camera2:$cameraxVersion")
     implementation("androidx.camera:camera-lifecycle:$cameraxVersion")
     implementation("androidx.camera:camera-view:$cameraxVersion")
+
+    // Unit testing — used first for CropMath, the trickiest pure logic
+    // in Phase 1. Runs on the JVM, no emulator/device needed.
+    testImplementation("junit:junit:4.13.2")
 }
