@@ -1,6 +1,20 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    id("org.jetbrains.kotlin.plugin.serialization")
+}
+
+// Secrets (BASE_URL, API_KEY) live in local.properties, which is
+// gitignored and never committed. Each developer sets their own copy.
+// Falls back to obviously-fake placeholders so the project still
+// compiles for someone who hasn't set these up yet.
+val localProperties = Properties().apply {
+    val localPropertiesFile = rootProject.file("local.properties")
+    if (localPropertiesFile.exists()) {
+        load(localPropertiesFile.inputStream())
+    }
 }
 
 android {
@@ -13,10 +27,22 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "0.1.0"
+
+        buildConfigField(
+            "String",
+            "BACKEND_BASE_URL",
+            "\"${localProperties.getProperty("backend.baseUrl", "http://10.0.2.2:8000")}\""
+        )
+        buildConfigField(
+            "String",
+            "BACKEND_API_KEY",
+            "\"${localProperties.getProperty("backend.apiKey", "REPLACE_ME_IN_LOCAL_PROPERTIES")}\""
+        )
     }
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     composeOptions {
@@ -34,8 +60,6 @@ android {
 }
 
 dependencies {
-    // Bare-bones Compose only. CameraX, Retrofit, etc. are added in their
-    // respective phase branches, not here on master.
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.activity:activity-compose:1.9.0")
     implementation(platform("androidx.compose:compose-bom:2024.06.00"))
@@ -51,6 +75,14 @@ dependencies {
     implementation("androidx.camera:camera-camera2:$cameraxVersion")
     implementation("androidx.camera:camera-lifecycle:$cameraxVersion")
     implementation("androidx.camera:camera-view:$cameraxVersion")
+
+    // Networking — Phase 2. kotlinx.serialization matches the JSON
+    // shapes exactly, no reflection like Gson/Moshi.
+    implementation("com.squareup.retrofit2:retrofit:2.11.0")
+    implementation("com.jakewharton.retrofit:retrofit2-kotlinx-serialization-converter:1.0.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
 
     // Unit testing — used first for CropMath, the trickiest pure logic
     // in Phase 1. Runs on the JVM, no emulator/device needed.
