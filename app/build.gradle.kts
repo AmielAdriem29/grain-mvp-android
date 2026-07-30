@@ -43,4 +43,16 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.ui:ui-tooling-preview")
     debugImplementation("androidx.compose.ui:ui-tooling")
+
+    // CameraX — Phase 1 (camera, crop, downscale). Version 1.3.x is stable
+    // and does not force compileSdk 34+ the way 1.4/1.5 betas do.
+    val cameraxVersion = "1.3.4"
+    implementation("androidx.camera:camera-core:$cameraxVersion")
+    implementation("androidx.camera:camera-camera2:$cameraxVersion")
+    implementation("androidx.camera:camera-lifecycle:$cameraxVersion")
+    implementation("androidx.camera:camera-view:$cameraxVersion")
+
+    // Unit testing — used first for CropMath, the trickiest pure logic
+    // in Phase 1. Runs on the JVM, no emulator/device needed.
+    testImplementation("junit:junit:4.13.2")
 }
