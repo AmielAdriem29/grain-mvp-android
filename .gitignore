@@ -1,0 +1,14 @@
+*.iml
+.gradle/
+/local.properties
+/.idea/
+.DS_Store
+/build/
+/captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+
+# Secrets — BackendConfig values are provided locally, never committed.
+# See README for how to set BASE_URL / API_KEY per developer machine.
