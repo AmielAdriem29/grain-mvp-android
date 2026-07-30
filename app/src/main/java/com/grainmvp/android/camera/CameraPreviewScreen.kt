@@ -7,6 +7,8 @@ import androidx.camera.core.CameraSelector
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -21,19 +23,30 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathOperation
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import kotlin.math.min
 
 /**
- * Phase 1, slice 1: live camera preview only.
+ * Phase 1, slice 2: square guide overlay on top of the live preview.
  *
- * No guide overlay, no capture button, no crop logic yet — those are
- * separate commits. This slice only proves the camera pipeline (permission
- * request -> ProcessCameraProvider -> Preview use case -> PreviewView)
- * works end to end.
+ * Purely visual in this commit — no capture button, no crop math wired
+ * up yet (that's slice 3). The guide's position/size here is exactly
+ * what the crop math in slice 3 will read from, per the spec:
+ *   guideSize = min(screenWidth, screenHeight)
+ *   portrait:  guideLeft = 0, guideTop = (screenHeight - guideSize) / 2
+ *   landscape: guideLeft = (screenWidth - guideSize) / 2, guideTop = 0
  */
 @Composable
 fun CameraPreviewScreen() {
@@ -50,7 +63,7 @@ fun CameraPreviewScreen() {
     ) { granted -> hasCameraPermission = granted }
 
     if (hasCameraPermission) {
-        CameraPreview()
+        CameraPreviewWithGuide()
     } else {
         PermissionRequestScreen(onRequestPermission = {
             permissionLauncher.launch(Manifest.permission.CAMERA)
@@ -73,6 +86,49 @@ private fun PermissionRequestScreen(onRequestPermission: () -> Unit) {
         )
         Button(onClick = onRequestPermission, modifier = Modifier.padding(top = 16.dp)) {
             Text("Grant camera permission")
+        }
+    }
+}
+
+@Composable
+private fun CameraPreviewWithGuide() {
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        CameraPreview()
+
+        val density = LocalDensity.current
+        val screenWidthPx = with(density) { maxWidth.toPx() }
+        val screenHeightPx = with(density) { maxHeight.toPx() }
+        val guideSize = min(screenWidthPx, screenHeightPx)
+        val isPortrait = screenHeightPx >= screenWidthPx
+        val guideLeft = if (isPortrait) 0f else (screenWidthPx - guideSize) / 2f
+        val guideTop = if (isPortrait) (screenHeightPx - guideSize) / 2f else 0f
+
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            // Dim everything outside the guide square, leaving the square
+            // itself clear, then draw a border around it.
+            val fullArea = Path().apply {
+                addRect(Rect(0f, 0f, size.width, size.height))
+            }
+            val guideArea = Path().apply {
+                addRect(
+                    Rect(
+                        guideLeft,
+                        guideTop,
+                        guideLeft + guideSize,
+                        guideTop + guideSize
+                    )
+                )
+            }
+            val dimArea = Path().apply {
+                op(fullArea, guideArea, PathOperation.Difference)
+            }
+            drawPath(dimArea, color = Color.Black.copy(alpha = 0.5f))
+            drawRect(
+                color = Color.White,
+                topLeft = Offset(guideLeft, guideTop),
+                size = Size(guideSize, guideSize),
+                style = Stroke(width = 3.dp.toPx())
+            )
         }
     }
 }
