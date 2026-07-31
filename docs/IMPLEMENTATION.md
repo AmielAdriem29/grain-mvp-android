@@ -82,7 +82,7 @@ other file's point of view: `BuildConfig.BACKEND_BASE_URL` /
 object's fields would be.
 
 **Still to do this phase:**
-- Actually verifying the checkpoint once Sitoy's server is reachable -
+- Actually verifying the checkpoint once Sitoy's server is reachable —
   run `NetworkTestScreen`, confirm a real parsed `PredictResponse` comes
   back, then delete the test screen and its debug toggle in `MainActivity`
 
@@ -106,7 +106,7 @@ Correction → Confirm). Tap-to-toggle confirmed reversible both ways
 appears at tap location). Instructional text was revised from "tap
 empty space" to "tap directly on a missed grain" since the original
 wording was misleading — you're marking an undetected grain, not
-literal blank background.s
+literal blank background.
 
 **Deviation from spec:** re-tapping a box that started as `"added"` and
 was then toggled to `"removed"` resets it to `null` rather than back to
@@ -139,9 +139,56 @@ not a correctness issue for the main flow, but worth knowing about.
 
 ## Phase 4 — Submit
 
-Not started. Requirements per `SPEC.md`: wire Submit to
-`submitReplicate()`, disable-while-in-flight, success/failure handling,
-manual retry with no duplicate-prevention (per spec, this is accepted).
+| Requirement | Implemented in | Status | Notes |
+|---|---|---|---|
+| Wire Submit to real `POST /api/replicate` | `SubmitScreen.kt` → `submit()` | ✅ | Calls `RetrofitClient.apiService.submitReplicate()` directly — no fake dev stand-in this time, see reasoning below |
+| Disable button + show spinner while in flight | `SubmitScreen.kt` → `SubmitState.Loading` | ✅ | `enabled = currentState !is SubmitState.Loading`, blocks double-tap |
+| Success: show confirmation, return to capture | `SubmitScreen.kt` → `SuccessScreen()` | ✅ | Shows `percentage`/`grade` per spec's suggestion; "New Sample" returns to `Screen.Capture` |
+| Failure: clear error, manual retry (same request) | `SubmitScreen.kt` → `SubmitState.Error` | ✅ | Broad `catch (e: Exception)` surfaces connection errors, timeouts, wrong API key, etc. as visible text. Retry just re-calls `submit()` with the same already-entered field values — no duplicate-prevention, per spec |
+| Name + SampleType input screen | `SubmitScreen.kt` → `OutlinedTextField`s | ✅ | Not explicitly in `SPEC.md`'s Phase 4 section, but required by `/api/replicate`'s contract and matches Fateful's wireframe (screen 4, after Correction's Confirm) |
+
+**Deliberate deviation from the Phase 2/3 pattern — no fake data this
+time:** Phase 3 needed `FakeGrainsForDev.kt` because without it, there
+was no way to reach or test the Correction screen at all. Phase 4 is
+different: wiring the **real** `submitReplicate()` call directly still
+lets us fully test the loading/disable/error/retry states, since a
+connection failure (expected right now, no backend running) exercises
+exactly the same code path a real failure would. Only the **success**
+confirmation screen stays genuinely unverified until Sitoy's backend
+exists — same "code ready, checkpoint blocked" situation as Phase 2.
+
+**Still tied to Phase 3's fake data:** `aiPredictedGrains` sent here is
+still `FAKE_GRAINS_FOR_DEV_ONLY` (passed through from `MainActivity`'s
+`Screen.Correction` → `Screen.Submit` transition), not a real AI
+response. This resolves automatically once Phase 2/3's fake-data
+wiring is swapped for the real `predict()` call — no separate fix
+needed in `SubmitScreen.kt` itself.
+
+**Phase 4 checkpoint:** loading/disable/error/retry states are
+verifiable now, offline. Full success-path verification requires
+Sitoy's backend, same blocker as Phase 2.
+
+**Deviation — cleartext HTTP allowed:** `AndroidManifest.xml` sets
+`android:usesCleartextTraffic="true"`. Android blocks plain HTTP by
+default since API 28; without this, every request to a plain
+`http://` backend (like the dev alias `10.0.2.2:8000`) fails at the OS
+level with `CLEARTEXT communication ... not permitted`, before it even
+leaves the phone. Acceptable for this MVP since Sitoy's backend almost
+certainly won't have HTTPS set up — **flag for whoever eventually
+deploys this for real**: a production app should use HTTPS and remove
+this flag.
+
+**Not in spec — decisions made to keep moving, flagged for Fateful:**
+- **SampleType input is free text, not a dropdown.** `sampleId`
+  represents a rice variety (per Fateful: "sampleID(type of rice)"),
+  which is almost certainly a small, fixed, known set in practice —
+  free text risks inconsistent data (typos, casing, trailing spaces
+  all creating "different" varieties in the database). Left as a plain
+  `OutlinedTextField` for now because **no actual list of valid
+  varieties has been provided anywhere** — not in any spec, not in the
+  wireframes. The dashboard spec's example (`"RC-Dinorado-004"`) only
+  shows a naming *format*, not a real list. Needs an answer from
+  Fateful before converting this to a dropdown/spinner.
 
 ---
 
