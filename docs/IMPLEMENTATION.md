@@ -64,8 +64,8 @@ Phase 3/4 screens shouldn't be finalized until this is answered.
 | `POST /api/replicate` as suspend fn | `network/ApiService.kt` → `submitReplicate()` | ✅ | Multipart, matches spec's 6 form fields exactly |
 | 30-second HTTP timeout | `network/RetrofitClient.kt` | ✅ | connect/read/write all set to 30s |
 | GrainBox/PredictResponse/ReplicateResponse models | `network/ApiModels.kt` | ✅ | Field names match spec exactly (lowercase, no underscores) |
-| Throwaway test screen calling both endpoints | — | ⬜ | Next up — spec's own Phase 2 checkpoint |
-| Phase 2 checkpoint: call both endpoints, get parsed responses | — | ⬜ | Blocked on Sitoy's real BASE_URL/API_KEY being reachable |
+| Throwaway test screen calling both endpoints | `network/NetworkTestScreen.kt` | ✅ | Reachable via a temporary "Network Test" debug button in `MainActivity` (top-right corner) — not real navigation, delete both once Phase 2 is verified |
+| Phase 2 checkpoint: call both endpoints, get parsed responses | — | ⬜ | Code is ready; blocked on Sitoy's real BASE_URL/API_KEY being reachable and running |
 
 **Deviation from spec:** spec says *"Every network call in this app
 reads from this object [`BackendConfig`]. Never write the URL or key
@@ -82,8 +82,9 @@ other file's point of view: `BuildConfig.BACKEND_BASE_URL` /
 object's fields would be.
 
 **Still to do this phase:**
-- Throwaway test screen (button that calls `predict()`, shows result/error on screen)
-- Actually verifying the checkpoint once Sitoy's server is reachable
+- Actually verifying the checkpoint once Sitoy's server is reachable -
+  run `NetworkTestScreen`, confirm a real parsed `PredictResponse` comes
+  back, then delete the test screen and its debug toggle in `MainActivity`
 
 ---
 
