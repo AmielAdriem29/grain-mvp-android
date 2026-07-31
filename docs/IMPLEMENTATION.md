@@ -100,6 +100,14 @@ object's fields would be.
 | Weight input field | `CorrectionScreen.kt` → `OutlinedTextField` | ✅ | Numeric/decimal keyboard. Placed on this screen (not the Name/SampleType screen) — see note below |
 | "Retake photo" button | `CorrectionScreen.kt` → `onRetakePhoto` | ✅ | Labeled "New Photo" to match Fateful's wireframe wording |
 
+**Verified on-device:** full loop tested (Capture → Review → Classify →
+Correction → Confirm). Tap-to-toggle confirmed reversible both ways
+(blue → grey → blue), tap-empty-area-to-add confirmed (green box
+appears at tap location). Instructional text was revised from "tap
+empty space" to "tap directly on a missed grain" since the original
+wording was misleading — you're marking an undetected grain, not
+literal blank background.s
+
 **Deviation from spec:** re-tapping a box that started as `"added"` and
 was then toggled to `"removed"` resets it to `null` rather than back to
 `"added"`. The spec's toggle rule only describes `null/kept ↔ removed`
