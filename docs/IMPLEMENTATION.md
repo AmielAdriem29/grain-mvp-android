@@ -90,9 +90,44 @@ object's fields would be.
 
 ## Phase 3 — Correction Screen
 
-Not started. Requirements per `SPEC.md`: full-width 1024×1024 image
-display, `displayScale` tap-to-image-coordinate conversion, box
-add/toggle logic, weight input, retake button.
+| Requirement | Implemented in | Status | Notes |
+|---|---|---|---|
+| Full-width 1024×1024 image display | `CorrectionScreen.kt` | ✅ | `displayScale = screenWidthPx / 1024`, per spec |
+| Draw GrainBox rectangles, color by action | `CorrectionScreen.kt` → `Canvas` block | ✅ | blue = null/untouched, grey = removed, green = added |
+| Tap-to-toggle existing box (null/kept ↔ removed) | `CorrectionScreen.kt` → `pointerInput`/`detectTapGestures` | ✅ | See deviation note below |
+| Tap empty space to add a new 24×24 box | `CorrectionScreen.kt` → `pointerInput`/`detectTapGestures` | ✅ | Box placed with tap point as top-left corner, per spec's literal `x = imageX, y = imageY` — not centered on the tap. Worth revisiting with Fateful if it feels visually awkward in practice |
+| Box list in observable state | `CorrectionScreen.kt` → `mutableStateListOf<GrainBox>()` | ✅ | Reuses `network.GrainBox` directly rather than a duplicate model |
+| Weight input field | `CorrectionScreen.kt` → `OutlinedTextField` | ✅ | Numeric/decimal keyboard. Placed on this screen (not the Name/SampleType screen) — see note below |
+| "Retake photo" button | `CorrectionScreen.kt` → `onRetakePhoto` | ✅ | Labeled "New Photo" to match Fateful's wireframe wording |
+
+**Deviation from spec:** re-tapping a box that started as `"added"` and
+was then toggled to `"removed"` resets it to `null` rather than back to
+`"added"`. The spec's toggle rule only describes `null/kept ↔ removed`
+and doesn't cover re-toggling a user-added box specifically. This is a
+minor, rare edge case (removing then un-removing your own added box) —
+not a correctness issue for the main flow, but worth knowing about.
+
+**Not in spec — decisions made to keep moving, flagged for Fateful:**
+- **Weight field placement:** none of the wireframes show a weight
+  input anywhere. We placed it on this screen (Correction), reasoning
+  that weighing the identified immature grains chronologically happens
+  right after correcting which grains count as immature, and right
+  before submission. Easy to relocate if Fateful wants it elsewhere —
+  it's a single `TextField`.
+- **Fake development data:** since Sitoy hasn't started backend work,
+  this screen is currently fed by `dev/FakeGrainsForDev.kt` — 5
+  hardcoded placeholder boxes — instead of a real `/api/predict`
+  response. This is **not a spec requirement**, purely a workaround so
+  Android work isn't blocked. Wired in at `MainActivity`'s
+  `Screen.Correction` branch. **Must be deleted** and swapped for a
+  real `predict()` call once Phase 2 is verified against a running
+  backend — tracked here so it doesn't get forgotten.
+- **`technicianName`/`sampleId` timing:** resolved via discussion —
+  `/api/predict` never persists these fields (prediction-only, no DB
+  write per `02_BACKEND_SPEC.md`), so Android can send placeholder/empty
+  values at that call and only require the real values later at
+  `/api/replicate`'s screen, matching Fateful's wireframe order exactly.
+  No screens need reordering.
 
 ## Phase 4 — Submit
 

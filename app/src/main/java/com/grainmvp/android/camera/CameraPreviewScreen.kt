@@ -59,7 +59,7 @@ import kotlin.math.min
  * No navigation library needed yet since there are only two states.
  */
 @Composable
-fun CameraPreviewScreen() {
+fun CameraPreviewScreen(onImageConfirmed: (Bitmap) -> Unit) {
     val context = LocalContext.current
     var hasCameraPermission by remember {
         mutableStateOf(
@@ -86,11 +86,7 @@ fun CameraPreviewScreen() {
         ReviewScreen(
             image = currentImage,
             onRetake = { capturedImage = null },
-            onContinue = {
-                // Phase 2 (networking) wires this to POST /api/predict.
-                // For now this slice just proves capture -> crop ->
-                // downscale -> review works end to end.
-            }
+            onContinue = { onImageConfirmed(currentImage) }
         )
     } else {
         CaptureScreen(onCaptured = { bitmap -> capturedImage = bitmap })
