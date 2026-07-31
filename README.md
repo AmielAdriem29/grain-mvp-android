@@ -99,3 +99,14 @@ context without re-reading the whole spec. Newest entries on top.
 - GrainBox field names are fixed and must match exactly across Android,
   backend, and dashboard: `x, y, width, height, confidence, action`
   (lowercase, no underscores). `action` is `"kept" | "removed" | "added" | null`.
+- 
+## Docs
+
+- [`docs/SPEC.md`](docs/SPEC.md) — the original build spec from Fateful,
+  verbatim, frozen. Never edited to match reality; if a requirement is
+  wrong or outdated, that's raised with Fateful, not silently patched here.
+- [`docs/IMPLEMENTATION.md`](docs/IMPLEMENTATION.md) — living doc mapping
+  every spec requirement to the actual file/class that implements it,
+  per-phase status, and any deviations from spec (imwith reasoning).
+  **Update this file every time a phase's code changes**, not just when
+  a phase finishes.
