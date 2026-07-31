@@ -22,21 +22,28 @@ import androidx.compose.ui.unit.dp
 import com.grainmvp.android.camera.CameraPreviewScreen
 import com.grainmvp.android.correction.CorrectionScreen
 import com.grainmvp.android.dev.FAKE_GRAINS_FOR_DEV_ONLY
+import com.grainmvp.android.network.GrainBox
 import com.grainmvp.android.network.NetworkTestScreen
+import com.grainmvp.android.submit.SubmitScreen
 
 /**
  * Entry point. Screens are swapped in per phase branch:
  *  - Phase 1: live camera preview (done)
- *  - Phase 3: correction screen (this commit)
- *  - Phase 4: submit flow (not yet wired -- see onSubmit below)
+ *  - Phase 3: correction screen (done)
+ *  - Phase 4: submit flow (this commit)
  *
  * Screen state is a simple sealed class rather than a real navigation
- * library, since there are still only a handful of screens. Revisit
- * this once Phase 4 adds more states (loading, success, error).
+ * library, since there are still only a handful of screens.
  */
 private sealed class Screen {
     data object Capture : Screen()
     data class Correction(val image: Bitmap) : Screen()
+    data class Submit(
+        val image: Bitmap,
+        val aiPredictedGrains: List<GrainBox>,
+        val confirmedGrains: List<GrainBox>,
+        val weight: String
+    ) : Screen()
 }
 
 class MainActivity : ComponentActivity() {
@@ -94,13 +101,28 @@ fun GrainMvpApp() {
                         // is reachable.
                         initialGrains = FAKE_GRAINS_FOR_DEV_ONLY,
                         onRetakePhoto = { screen = Screen.Capture },
-                        onSubmit = { _, _ ->
-                            // Phase 4 wires this to the real submitReplicate()
-                            // call. For now, just return to Capture so the
-                            // Correction screen's own flow can be verified
-                            // end to end.
-                            screen = Screen.Capture
+                        onSubmit = { confirmedGrains, weight ->
+                            screen = Screen.Submit(
+                                image = currentScreen.image,
+                                // The "unmodified original AI list" the spec
+                                // requires for aiPredictedGrains is exactly
+                                // what Correction started from -- currently
+                                // the same fake data, until Phase 2 is real.
+                                aiPredictedGrains = FAKE_GRAINS_FOR_DEV_ONLY,
+                                confirmedGrains = confirmedGrains,
+                                weight = weight
+                            )
                         }
+                    )
+                }
+
+                is Screen.Submit -> {
+                    SubmitScreen(
+                        image = currentScreen.image,
+                        aiPredictedGrains = currentScreen.aiPredictedGrains,
+                        confirmedGrains = currentScreen.confirmedGrains,
+                        weight = currentScreen.weight,
+                        onDone = { screen = Screen.Capture }
                     )
                 }
             }
