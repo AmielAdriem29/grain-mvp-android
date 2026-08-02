@@ -37,6 +37,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.grainmvp.android.network.GrainBox
+import com.grainmvp.android.ui.components.AppHeader
 
 private const val IMAGE_SIZE = 1024
 
@@ -69,22 +70,7 @@ fun CorrectionScreen(
     var weightText by remember { mutableStateOf("") }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        Text(
-            "Review and Correct",
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 16.dp, start = 16.dp, end = 16.dp),
-            textAlign = TextAlign.Center
-        )
-        Text(
-            "Tap a box to remove it. Tap directly on a missed grain to mark it as immature.",
-            style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 4.dp),
-            textAlign = TextAlign.Center
-        )
+        AppHeader("Review and Correct")
 
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
             val displayScale = constraints.maxWidth.toFloat() / IMAGE_SIZE
@@ -132,14 +118,29 @@ fun CorrectionScreen(
             }
         }
 
+        Text(
+            "Tap a box to remove it. Tap directly on a missed grain to mark it as immature.",
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 4.dp),
+            textAlign = TextAlign.Center
+        )
+
         OutlinedTextField(
             value = weightText,
             onValueChange = { weightText = it },
             label = { Text("Weight (grams)") },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            isError = weightText.isNotBlank() && !isValidWeightValue(weightText),
+            supportingText = {
+                if (weightText.isNotBlank() && !isValidWeightValue(weightText)) {
+                    Text("Enter a valid weight in grams (e.g. 12.45)")
+                }
+            },
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp)
+                .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 16.dp)
         )
 
         Row(
@@ -152,7 +153,7 @@ fun CorrectionScreen(
                 Text("New Photo")
             }
             Button(
-                enabled = weightText.isNotBlank(),
+                enabled = isValidWeightValue(weightText),
                 onClick = {
                     onSubmit(prepareGrainsForSubmission(grains), weightText)
                 }

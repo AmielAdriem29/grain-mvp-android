@@ -141,4 +141,47 @@ class CorrectionLogicTest {
 
         assertEquals(0, result.size)
     }
+
+    // ---- isValidWeightValue ----
+
+    @Test
+    fun `empty string is invalid`() {
+        assertEquals(false, isValidWeightValue(""))
+    }
+
+    @Test
+    fun `a positive whole number is valid`() {
+        assertEquals(true, isValidWeightValue("12"))
+    }
+
+    @Test
+    fun `a positive decimal is valid`() {
+        assertEquals(true, isValidWeightValue("12.45"))
+    }
+
+    @Test
+    fun `zero is invalid`() {
+        assertEquals(false, isValidWeightValue("0"))
+    }
+
+    @Test
+    fun `a negative number is invalid`() {
+        assertEquals(false, isValidWeightValue("-5"))
+    }
+
+    @Test
+    fun `letters are invalid`() {
+        assertEquals(false, isValidWeightValue("abc"))
+        assertEquals(false, isValidWeightValue("12a"))
+    }
+
+    @Test
+    fun `multiple decimal points is invalid`() {
+        assertEquals(false, isValidWeightValue("12.34.5"))
+    }
+
+    @Test
+    fun `whitespace-only is invalid`() {
+        assertEquals(false, isValidWeightValue("   "))
+    }
 }
