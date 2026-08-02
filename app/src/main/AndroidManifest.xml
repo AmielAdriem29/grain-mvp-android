@@ -2,14 +2,15 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
-    <!-- CAMERA permission is added in the Phase 1 (camera/crop) branch,
-         intentionally left out of the bare-bones master skeleton. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera.any" android:required="true" />
 
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:theme="@style/Theme.GrainMVP"
+        android:usesCleartextTraffic="true"
         android:supportsRtl="true">
 
         <activity

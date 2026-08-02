@@ -1,3 +1,7 @@
 <resources>
-    <style name="Theme.GrainMVP" parent="android:Theme.Material.Light.NoActionBar" />
+    <style name="Theme.GrainMVP" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/warm_background</item>
+        <item name="android:colorPrimary">@color/rice_green</item>
+        <item name="android:statusBarColor">@color/rice_green</item>
+    </style>
 </resources>
