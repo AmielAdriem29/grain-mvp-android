@@ -246,14 +246,7 @@ private fun processCapturedImage(
 @Composable
 private fun ReviewScreen(image: Bitmap, onRetake: () -> Unit, onContinue: () -> Unit) {
     Column(modifier = Modifier.fillMaxSize()) {
-        Text(
-            "Review Photo",
-            style = MaterialTheme.typography.headlineSmall,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(24.dp),
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center
-        )
+        com.grainmvp.android.ui.components.AppHeader("Review Photo")
 
         Box(modifier = Modifier.weight(1f)) {
             Image(

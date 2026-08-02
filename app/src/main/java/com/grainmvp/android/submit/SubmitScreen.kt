@@ -26,6 +26,7 @@ import com.grainmvp.android.network.ReplicateResponse
 import com.grainmvp.android.network.RetrofitClient
 import com.grainmvp.android.network.toImagePart
 import com.grainmvp.android.network.toTextPart
+import com.grainmvp.android.ui.components.AppHeader
 import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -101,60 +102,63 @@ fun SubmitScreen(
         return
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        verticalArrangement = Arrangement.Center
-    ) {
-        Text("Name:", style = MaterialTheme.typography.bodyLarge)
-        OutlinedTextField(
-            value = technicianName,
-            onValueChange = { technicianName = it },
-            enabled = currentState !is SubmitState.Loading,
+    Column(modifier = Modifier.fillMaxSize()) {
+        AppHeader("Submit Sample")
+
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 16.dp)
-        )
-
-        Text("SampleType", style = MaterialTheme.typography.bodyLarge)
-        OutlinedTextField(
-            value = sampleId,
-            onValueChange = { sampleId = it },
-            enabled = currentState !is SubmitState.Loading,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 16.dp)
-        )
-
-        if (currentState is SubmitState.Error) {
-            Text(
-                "Submission failed: ${currentState.message}",
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.padding(bottom = 16.dp)
-            )
-        }
-
-        Button(
-            onClick = { submit() },
-            // Spec: disable while in flight, no second tap allowed.
-            enabled = currentState !is SubmitState.Loading &&
-                    technicianName.isNotBlank() &&
-                    sampleId.isNotBlank(),
-            modifier = Modifier.fillMaxWidth()
+                .fillMaxSize()
+                .padding(24.dp)
         ) {
-            if (currentState is SubmitState.Loading) {
-                CircularProgressIndicator(
-                    modifier = Modifier.padding(end = 8.dp),
-                    color = MaterialTheme.colorScheme.onPrimary
+            Text("Name:", style = MaterialTheme.typography.bodyLarge)
+            OutlinedTextField(
+                value = technicianName,
+                onValueChange = { technicianName = it },
+                enabled = currentState !is SubmitState.Loading,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp)
+            )
+
+            Text("SampleType", style = MaterialTheme.typography.bodyLarge)
+            OutlinedTextField(
+                value = sampleId,
+                onValueChange = { sampleId = it },
+                enabled = currentState !is SubmitState.Loading,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp)
+            )
+
+            if (currentState is SubmitState.Error) {
+                Text(
+                    "Submission failed: ${currentState.message}",
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(bottom = 16.dp)
                 )
-                Text("Submitting...")
-            } else if (currentState is SubmitState.Error) {
-                // Spec: retry simply calls the same endpoint again with
-                // the same data -- no special duplicate-prevention logic.
-                Text("Retry Submit")
-            } else {
-                Text("Submit")
+            }
+
+            Button(
+                onClick = { submit() },
+                // Spec: disable while in flight, no second tap allowed.
+                enabled = currentState !is SubmitState.Loading &&
+                        technicianName.isNotBlank() &&
+                        sampleId.isNotBlank(),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                if (currentState is SubmitState.Loading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.padding(end = 8.dp),
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                    Text("Submitting...")
+                } else if (currentState is SubmitState.Error) {
+                    // Spec: retry simply calls the same endpoint again with
+                    // the same data -- no special duplicate-prevention logic.
+                    Text("Retry Submit")
+                } else {
+                    Text("Submit")
+                }
             }
         }
     }
