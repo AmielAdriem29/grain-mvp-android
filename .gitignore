@@ -10,6 +10,6 @@
 .cxx/
 *.apk
 *.aab
-
+.artifacts/
 # Secrets — BackendConfig values are provided locally, never committed.
 # See README for how to set BASE_URL / API_KEY per developer machine.

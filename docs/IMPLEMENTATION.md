@@ -190,6 +190,25 @@ this flag.
   shows a naming *format*, not a real list. Needs an answer from
   Fateful before converting this to a dropdown/spinner.
 
+## Phase 5 — Polish (not in SPEC.md's build order, added by us)
+
+Not a numbered phase in `SPEC.md` — the spec's "Things You Do NOT Need
+To Do" section implies polish is optional for the MVP. Tracked here
+since real work happened and future contributors should know about it.
+
+| What | Implemented in | Notes |
+|---|---|---|
+| Unit tests for Correction's tap logic | `CorrectionLogic.kt` + `CorrectionLogicTest.kt` | Extracted from inline `pointerInput` code, same pattern as Phase 1's `CropMath.kt`. 12 tests |
+| Weight input validation | `CorrectionLogic.kt` → `isValidWeightValue()` | Gates the Confirm button + shows a visible error message; deliberately does NOT block keystrokes (silently rejecting typed characters reads as a broken keyboard). 8 tests |
+| PhilRice-derived visual theme | `ui/theme/Color.kt`, `ui/theme/Theme.kt` | Deep green + gold + warm off-white, applied app-wide via `GrainMvpTheme` |
+| Branded header component | `ui/components/AppHeader.kt` | Applied to Review, Correction, Submit screens. Capture screen deliberately left full-bleed/header-free, matching the original wireframe |
+| Home/Welcome screen | `home/HomeScreen.kt` | Shown first on launch, before Capture. Camera permission is no longer requested the instant the app opens — only once the user taps "Start Scanning." Not a spec requirement, a UX improvement |
+
+**Still open from earlier phases, unresolved:**
+- Weight field placement (Correction vs. a separate screen) — Fateful hasn't answered yet
+- SampleType as free text vs. dropdown — no list of valid rice varieties provided yet
+- Phase 2/4's real backend verification — still blocked on Sitoy
+
 ---
 
 ## Cross-cutting notes (apply to every phase)

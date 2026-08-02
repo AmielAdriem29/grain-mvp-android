@@ -37,9 +37,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.grainmvp.android.network.GrainBox
+import com.grainmvp.android.ui.components.AppHeader
 
 private const val IMAGE_SIZE = 1024
-private const val NEW_BOX_SIZE = 24
 
 /**
  * Phase 3 — Correction Screen, per SPEC.md:
@@ -70,22 +70,7 @@ fun CorrectionScreen(
     var weightText by remember { mutableStateOf("") }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        Text(
-            "Review and Correct",
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 16.dp, start = 16.dp, end = 16.dp),
-            textAlign = TextAlign.Center
-        )
-        Text(
-            "Tap a box to remove it. Tap directly on a missed grain to mark it as immature.",
-            style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 4.dp),
-            textAlign = TextAlign.Center
-        )
+        AppHeader("Review and Correct")
 
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
             val displayScale = constraints.maxWidth.toFloat() / IMAGE_SIZE
@@ -100,30 +85,12 @@ fun CorrectionScreen(
                             val imageX = tapOffset.x / displayScale
                             val imageY = tapOffset.y / displayScale
 
-                            val tappedIndex = grains.indexOfFirst { box ->
-                                imageX >= box.x && imageX < box.x + box.width &&
-                                        imageY >= box.y && imageY < box.y + box.height
-                            }
+                            val tappedIndex = findTappedBoxIndex(grains, imageX, imageY)
 
                             if (tappedIndex >= 0) {
-                                val box = grains[tappedIndex]
-                                grains[tappedIndex] = if (box.action == "removed") {
-                                    box.copy(action = null)
-                                } else {
-                                    box.copy(action = "removed")
-                                }
+                                grains[tappedIndex] = toggleGrainBoxAction(grains[tappedIndex])
                             } else {
-                                // Spec: new box at (imageX, imageY), fixed 24x24
-                                grains.add(
-                                    GrainBox(
-                                        x = imageX.toInt(),
-                                        y = imageY.toInt(),
-                                        width = NEW_BOX_SIZE,
-                                        height = NEW_BOX_SIZE,
-                                        confidence = null,
-                                        action = "added"
-                                    )
-                                )
+                                grains.add(createAddedGrainBox(imageX, imageY))
                             }
                         }
                     }
@@ -151,14 +118,29 @@ fun CorrectionScreen(
             }
         }
 
+        Text(
+            "Tap a box to remove it. Tap directly on a missed grain to mark it as immature.",
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 4.dp),
+            textAlign = TextAlign.Center
+        )
+
         OutlinedTextField(
             value = weightText,
             onValueChange = { weightText = it },
             label = { Text("Weight (grams)") },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            isError = weightText.isNotBlank() && !isValidWeightValue(weightText),
+            supportingText = {
+                if (weightText.isNotBlank() && !isValidWeightValue(weightText)) {
+                    Text("Enter a valid weight in grams (e.g. 12.45)")
+                }
+            },
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp)
+                .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 16.dp)
         )
 
         Row(
@@ -171,17 +153,9 @@ fun CorrectionScreen(
                 Text("New Photo")
             }
             Button(
-                enabled = weightText.isNotBlank(),
+                enabled = isValidWeightValue(weightText),
                 onClick = {
-                    // Backend's example confirmedGrains payload shows
-                    // untouched boxes as action: "kept", not null. Convert
-                    // here at the correction -> submit boundary so the
-                    // Canvas color logic above can keep treating null as
-                    // simply "untouched/blue" without a separate case.
-                    val confirmed = grains.map {
-                        if (it.action == null) it.copy(action = "kept") else it
-                    }
-                    onSubmit(confirmed, weightText)
+                    onSubmit(prepareGrainsForSubmission(grains), weightText)
                 }
             ) {
                 Text("Confirm")

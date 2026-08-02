@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -22,20 +21,26 @@ import androidx.compose.ui.unit.dp
 import com.grainmvp.android.camera.CameraPreviewScreen
 import com.grainmvp.android.correction.CorrectionScreen
 import com.grainmvp.android.dev.FAKE_GRAINS_FOR_DEV_ONLY
+import com.grainmvp.android.home.HomeScreen
 import com.grainmvp.android.network.GrainBox
 import com.grainmvp.android.network.NetworkTestScreen
 import com.grainmvp.android.submit.SubmitScreen
+import com.grainmvp.android.ui.theme.GrainMvpTheme
 
 /**
  * Entry point. Screens are swapped in per phase branch:
  *  - Phase 1: live camera preview (done)
  *  - Phase 3: correction screen (done)
- *  - Phase 4: submit flow (this commit)
+ *  - Phase 4: submit flow (done)
+ *  - Phase 5 polish: Home screen added, shown first so the camera
+ *    permission dialog only appears once the user intentionally starts
+ *    a scan, not the instant the app launches.
  *
  * Screen state is a simple sealed class rather than a real navigation
  * library, since there are still only a handful of screens.
  */
 private sealed class Screen {
+    data object Home : Screen()
     data object Capture : Screen()
     data class Correction(val image: Bitmap) : Screen()
     data class Submit(
@@ -57,7 +62,7 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun GrainMvpApp() {
-    var screen by remember { mutableStateOf<Screen>(Screen.Capture) }
+    var screen by remember { mutableStateOf<Screen>(Screen.Home) }
 
     // TEMPORARY debug toggle to reach NetworkTestScreen (throwaway,
     // see network/NetworkTestScreen.kt). Only available from the
@@ -65,9 +70,13 @@ fun GrainMvpApp() {
     // and Phase 2 is verified -- this is not part of the real app flow.
     var showNetworkTest by remember { mutableStateOf(false) }
 
-    MaterialTheme {
+    GrainMvpTheme {
         Surface(modifier = Modifier.fillMaxSize()) {
             when (val currentScreen = screen) {
+                is Screen.Home -> {
+                    HomeScreen(onStart = { screen = Screen.Capture })
+                }
+
                 is Screen.Capture -> {
                     Box(modifier = Modifier.fillMaxSize()) {
                         if (showNetworkTest) {
@@ -122,7 +131,7 @@ fun GrainMvpApp() {
                         aiPredictedGrains = currentScreen.aiPredictedGrains,
                         confirmedGrains = currentScreen.confirmedGrains,
                         weight = currentScreen.weight,
-                        onDone = { screen = Screen.Capture }
+                        onDone = { screen = Screen.Home }
                     )
                 }
             }
