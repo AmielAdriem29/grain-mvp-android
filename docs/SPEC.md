@@ -3,7 +3,7 @@
 > This is a verbatim copy of the original spec as given, kept here for
 > reference. It is not edited to match reality — if a requirement here
 > turns out to be wrong, outdated, or needs to change, that's a
-> conversation to have with Fateful, not a silent edit to this file.
+> conversation to have with the Team Lead, not a silent edit to this file.
 > See `IMPLEMENTATION.md` for what was actually built, how it maps to
 > these requirements, and any deviations (with reasoning).
 
@@ -128,8 +128,8 @@ Field names must be spelled exactly like this in your JSON serialization. `x`, `
 1. Set up Jetpack Compose project. Add CameraX dependencies (`camera-core`, `camera-camera2`, `camera-lifecycle`, `camera-compose`).
 2. Show a live camera preview using `PreviewView`. Set `scaleType = FILL_CENTER` explicitly. Do not change this setting — the crop math below assumes it.
 3. Draw a square guide overlay on top of the preview. Square side length = `min(screenWidth, screenHeight)`. Center it on the longer axis (like a QR scanner).
-    - If portrait (screen taller than wide): `guideLeft = 0`, `guideTop = (screenHeight - guideSize) / 2`
-    - If landscape: `guideLeft = (screenWidth - guideSize) / 2`, `guideTop = 0`
+   - If portrait (screen taller than wide): `guideLeft = 0`, `guideTop = (screenHeight - guideSize) / 2`
+   - If landscape: `guideLeft = (screenWidth - guideSize) / 2`, `guideTop = 0`
 4. On photo capture, crop the actual sensor image to match exactly what the guide showed. Use this formula:
 
 ```

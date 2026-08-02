@@ -2,7 +2,7 @@
 
 This is a **living document** — update it every time a phase's code
 changes, not just when a phase finishes. `SPEC.md` in this same folder
-is the frozen source-of-truth requirement doc from Fateful; this file
+is the frozen source-of-truth requirement doc from the Team Lead; this file
 is where reality gets recorded: what actually got built, exactly where
 it lives, and anywhere the implementation deviates from the spec (with
 the reasoning, so it's a decision, not drift).
@@ -34,7 +34,7 @@ Status: ✅ done (`master` branch).
 | Crop math (sensor → guide-matched region) | `CropMath.kt` → `computeCropRegion()` | ✅ | Deliberately framework-free (no Bitmap/Android imports) so it's a fast JVM unit test, not an instrumented one |
 | Crop math unit tests | `CropMathTest.kt` | ✅ | 4 cases: portrait, landscape, degenerate square/square, bounds-safety. Expected values hand-calculated from the spec's formula, not derived from the implementation |
 | Downscale to 1024×1024 | `CameraPreviewScreen.kt` → `processCapturedImage()` | ✅ | `Bitmap.createScaledBitmap(cropped, 1024, 1024, true)`, exactly per spec |
-| Review screen (Retake/Continue) | `CameraPreviewScreen.kt` → `ReviewScreen()` | ✅ | Buttons labeled "Retry Photo" / "Classify" to match the wireframe Fateful shared, not spec's literal "Retake/Continue" wording |
+| Review screen (Retake/Continue) | `CameraPreviewScreen.kt` → `ReviewScreen()` | ✅ | Buttons labeled "Retry Photo" / "Classify" to match the wireframe the Team Lead shared, not spec's literal "Retake/Continue" wording |
 | Phase 1 checkpoint: capture/crop/downscale work offline | — | ✅ | Verified on both the Pixel 10 emulator (API 36.1) and a real physical device |
 
 **Deviations from spec:**
@@ -46,7 +46,7 @@ Status: ✅ done (`master` branch).
   silent no-op. Spec doesn't require error handling here yet; Phase 5
   polish is the intended place for a visible error message.
 
-**Open question for Fateful (unresolved as of Phase 2 start):**
+**Open question for the Team Lead (unresolved as of Phase 2 start):**
 None of the wireframes shared so far show a **weight input field**,
 but `weight` is required by `/api/replicate` per `02_BACKEND_SPEC.md`.
 Phase 3/4 screens shouldn't be finalized until this is answered.
@@ -95,10 +95,10 @@ object's fields would be.
 | Full-width 1024×1024 image display | `CorrectionScreen.kt` | ✅ | `displayScale = screenWidthPx / 1024`, per spec |
 | Draw GrainBox rectangles, color by action | `CorrectionScreen.kt` → `Canvas` block | ✅ | blue = null/untouched, grey = removed, green = added |
 | Tap-to-toggle existing box (null/kept ↔ removed) | `CorrectionScreen.kt` → `pointerInput`/`detectTapGestures` | ✅ | See deviation note below |
-| Tap empty space to add a new 24×24 box | `CorrectionScreen.kt` → `pointerInput`/`detectTapGestures` | ✅ | Box placed with tap point as top-left corner, per spec's literal `x = imageX, y = imageY` — not centered on the tap. Worth revisiting with Fateful if it feels visually awkward in practice |
+| Tap empty space to add a new 24×24 box | `CorrectionScreen.kt` → `pointerInput`/`detectTapGestures` | ✅ | Box placed with tap point as top-left corner, per spec's literal `x = imageX, y = imageY` — not centered on the tap. Worth revisiting with the Team Lead if it feels visually awkward in practice |
 | Box list in observable state | `CorrectionScreen.kt` → `mutableStateListOf<GrainBox>()` | ✅ | Reuses `network.GrainBox` directly rather than a duplicate model |
 | Weight input field | `CorrectionScreen.kt` → `OutlinedTextField` | ✅ | Numeric/decimal keyboard. Placed on this screen (not the Name/SampleType screen) — see note below |
-| "Retake photo" button | `CorrectionScreen.kt` → `onRetakePhoto` | ✅ | Labeled "New Photo" to match Fateful's wireframe wording |
+| "Retake photo" button | `CorrectionScreen.kt` → `onRetakePhoto` | ✅ | Labeled "New Photo" to match the Team Lead's wireframe wording |
 
 **Verified on-device:** full loop tested (Capture → Review → Classify →
 Correction → Confirm). Tap-to-toggle confirmed reversible both ways
@@ -115,12 +115,12 @@ and doesn't cover re-toggling a user-added box specifically. This is a
 minor, rare edge case (removing then un-removing your own added box) —
 not a correctness issue for the main flow, but worth knowing about.
 
-**Not in spec — decisions made to keep moving, flagged for Fateful:**
+**Not in spec — decisions made to keep moving, flagged for the Team Lead:**
 - **Weight field placement:** none of the wireframes show a weight
   input anywhere. We placed it on this screen (Correction), reasoning
   that weighing the identified immature grains chronologically happens
   right after correcting which grains count as immature, and right
-  before submission. Easy to relocate if Fateful wants it elsewhere —
+  before submission. Easy to relocate if the Team Lead wants it elsewhere —
   it's a single `TextField`.
 - **Fake development data:** since Sitoy hasn't started backend work,
   this screen is currently fed by `dev/FakeGrainsForDev.kt` — 5
@@ -134,7 +134,7 @@ not a correctness issue for the main flow, but worth knowing about.
   `/api/predict` never persists these fields (prediction-only, no DB
   write per `02_BACKEND_SPEC.md`), so Android can send placeholder/empty
   values at that call and only require the real values later at
-  `/api/replicate`'s screen, matching Fateful's wireframe order exactly.
+  `/api/replicate`'s screen, matching the Team Lead's wireframe order exactly.
   No screens need reordering.
 
 ## Phase 4 — Submit
@@ -145,7 +145,7 @@ not a correctness issue for the main flow, but worth knowing about.
 | Disable button + show spinner while in flight | `SubmitScreen.kt` → `SubmitState.Loading` | ✅ | `enabled = currentState !is SubmitState.Loading`, blocks double-tap |
 | Success: show confirmation, return to capture | `SubmitScreen.kt` → `SuccessScreen()` | ✅ | Shows `percentage`/`grade` per spec's suggestion; "New Sample" returns to `Screen.Capture` |
 | Failure: clear error, manual retry (same request) | `SubmitScreen.kt` → `SubmitState.Error` | ✅ | Broad `catch (e: Exception)` surfaces connection errors, timeouts, wrong API key, etc. as visible text. Retry just re-calls `submit()` with the same already-entered field values — no duplicate-prevention, per spec |
-| Name + SampleType input screen | `SubmitScreen.kt` → `OutlinedTextField`s | ✅ | Not explicitly in `SPEC.md`'s Phase 4 section, but required by `/api/replicate`'s contract and matches Fateful's wireframe (screen 4, after Correction's Confirm) |
+| Name + SampleType input screen | `SubmitScreen.kt` → `OutlinedTextField`s | ✅ | Not explicitly in `SPEC.md`'s Phase 4 section, but required by `/api/replicate`'s contract and matches the Team Lead's wireframe (screen 4, after Correction's Confirm) |
 
 **Deliberate deviation from the Phase 2/3 pattern — no fake data this
 time:** Phase 3 needed `FakeGrainsForDev.kt` because without it, there
@@ -178,9 +178,9 @@ certainly won't have HTTPS set up — **flag for whoever eventually
 deploys this for real**: a production app should use HTTPS and remove
 this flag.
 
-**Not in spec — decisions made to keep moving, flagged for Fateful:**
+**Not in spec — decisions made to keep moving, flagged for the Team Lead:**
 - **SampleType input is free text, not a dropdown.** `sampleId`
-  represents a rice variety (per Fateful: "sampleID(type of rice)"),
+  represents a rice variety (per the Team Lead: "sampleID(type of rice)"),
   which is almost certainly a small, fixed, known set in practice —
   free text risks inconsistent data (typos, casing, trailing spaces
   all creating "different" varieties in the database). Left as a plain
@@ -188,7 +188,9 @@ this flag.
   varieties has been provided anywhere** — not in any spec, not in the
   wireframes. The dashboard spec's example (`"RC-Dinorado-004"`) only
   shows a naming *format*, not a real list. Needs an answer from
-  Fateful before converting this to a dropdown/spinner.
+  the Team Lead before converting this to a dropdown/spinner.
+
+---
 
 ## Phase 5 — Polish (not in SPEC.md's build order, added by us)
 
@@ -205,11 +207,9 @@ since real work happened and future contributors should know about it.
 | Home/Welcome screen | `home/HomeScreen.kt` | Shown first on launch, before Capture. Camera permission is no longer requested the instant the app opens — only once the user taps "Start Scanning." Not a spec requirement, a UX improvement |
 
 **Still open from earlier phases, unresolved:**
-- Weight field placement (Correction vs. a separate screen) — Fateful hasn't answered yet
+- Weight field placement (Correction vs. a separate screen) — the Team Lead hasn't answered yet
 - SampleType as free text vs. dropdown — no list of valid rice varieties provided yet
 - Phase 2/4's real backend verification — still blocked on Sitoy
-
----
 
 ## Cross-cutting notes (apply to every phase)
 
