@@ -1,0 +1,144 @@
+package com.grainmvp.android.correction
+
+import com.grainmvp.android.network.GrainBox
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Test
+
+class CorrectionLogicTest {
+
+    // ---- findTappedBoxIndex ----
+
+    @Test
+    fun `tap inside a box returns that box's index`() {
+        val grains = listOf(
+            GrainBox(x = 100, y = 100, width = 24, height = 24, confidence = 0.8f, action = null),
+            GrainBox(x = 200, y = 200, width = 24, height = 24, confidence = 0.7f, action = null)
+        )
+
+        // Well inside the second box's bounds (200-224, 200-224)
+        val result = findTappedBoxIndex(grains, imageX = 210f, imageY = 210f)
+
+        assertEquals(1, result)
+    }
+
+    @Test
+    fun `tap outside every box returns -1`() {
+        val grains = listOf(
+            GrainBox(x = 100, y = 100, width = 24, height = 24, confidence = 0.8f, action = null)
+        )
+
+        val result = findTappedBoxIndex(grains, imageX = 500f, imageY = 500f)
+
+        assertEquals(-1, result)
+    }
+
+    @Test
+    fun `tap exactly on a box's top-left corner counts as inside`() {
+        val grains = listOf(
+            GrainBox(x = 100, y = 100, width = 24, height = 24, confidence = 0.8f, action = null)
+        )
+
+        val result = findTappedBoxIndex(grains, imageX = 100f, imageY = 100f)
+
+        assertEquals(0, result)
+    }
+
+    @Test
+    fun `tap exactly on a box's far edge (x+width) counts as outside`() {
+        // Half-open interval per the implementation: [x, x+width)
+        val grains = listOf(
+            GrainBox(x = 100, y = 100, width = 24, height = 24, confidence = 0.8f, action = null)
+        )
+
+        val result = findTappedBoxIndex(grains, imageX = 124f, imageY = 110f)
+
+        assertEquals(-1, result)
+    }
+
+    @Test
+    fun `empty grains list always returns -1`() {
+        val result = findTappedBoxIndex(emptyList(), imageX = 50f, imageY = 50f)
+
+        assertEquals(-1, result)
+    }
+
+    // ---- toggleGrainBoxAction ----
+
+    @Test
+    fun `toggling an untouched (null action) box marks it removed`() {
+        val box = GrainBox(x = 0, y = 0, width = 24, height = 24, confidence = 0.9f, action = null)
+
+        val result = toggleGrainBoxAction(box)
+
+        assertEquals("removed", result.action)
+    }
+
+    @Test
+    fun `toggling a removed box resets its action to null`() {
+        val box = GrainBox(x = 0, y = 0, width = 24, height = 24, confidence = 0.9f, action = "removed")
+
+        val result = toggleGrainBoxAction(box)
+
+        assertNull(result.action)
+    }
+
+    @Test
+    fun `toggling preserves every other field unchanged`() {
+        val box = GrainBox(x = 42, y = 99, width = 24, height = 24, confidence = 0.55f, action = null)
+
+        val result = toggleGrainBoxAction(box)
+
+        assertEquals(42, result.x)
+        assertEquals(99, result.y)
+        assertEquals(24, result.width)
+        assertEquals(24, result.height)
+        assertEquals(0.55f, result.confidence)
+    }
+
+    // ---- createAddedGrainBox ----
+
+    @Test
+    fun `created box has fixed 24x24 size and action added`() {
+        val result = createAddedGrainBox(imageX = 300.7f, imageY = 150.2f)
+
+        assertEquals(24, result.width)
+        assertEquals(24, result.height)
+        assertEquals("added", result.action)
+        assertNull(result.confidence)
+    }
+
+    @Test
+    fun `created box coordinates truncate toward zero, not rounded`() {
+        // Spec: x = imageX, y = imageY -- straightforward truncation via
+        // Float.toInt(), not Math.round().
+        val result = createAddedGrainBox(imageX = 300.9f, imageY = 150.9f)
+
+        assertEquals(300, result.x)
+        assertEquals(150, result.y)
+    }
+
+    // ---- prepareGrainsForSubmission ----
+
+    @Test
+    fun `untouched boxes convert to kept, others pass through unchanged`() {
+        val grains = listOf(
+            GrainBox(x = 0, y = 0, width = 24, height = 24, confidence = 0.9f, action = null),
+            GrainBox(x = 10, y = 10, width = 24, height = 24, confidence = 0.5f, action = "removed"),
+            GrainBox(x = 20, y = 20, width = 24, height = 24, confidence = null, action = "added")
+        )
+
+        val result = prepareGrainsForSubmission(grains)
+
+        assertEquals("kept", result[0].action)
+        assertEquals("removed", result[1].action)
+        assertEquals("added", result[2].action)
+    }
+
+    @Test
+    fun `empty list produces empty list`() {
+        val result = prepareGrainsForSubmission(emptyList())
+
+        assertEquals(0, result.size)
+    }
+}

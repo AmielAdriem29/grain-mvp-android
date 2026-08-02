@@ -39,7 +39,6 @@ import androidx.compose.ui.unit.dp
 import com.grainmvp.android.network.GrainBox
 
 private const val IMAGE_SIZE = 1024
-private const val NEW_BOX_SIZE = 24
 
 /**
  * Phase 3 — Correction Screen, per SPEC.md:
@@ -100,30 +99,12 @@ fun CorrectionScreen(
                             val imageX = tapOffset.x / displayScale
                             val imageY = tapOffset.y / displayScale
 
-                            val tappedIndex = grains.indexOfFirst { box ->
-                                imageX >= box.x && imageX < box.x + box.width &&
-                                        imageY >= box.y && imageY < box.y + box.height
-                            }
+                            val tappedIndex = findTappedBoxIndex(grains, imageX, imageY)
 
                             if (tappedIndex >= 0) {
-                                val box = grains[tappedIndex]
-                                grains[tappedIndex] = if (box.action == "removed") {
-                                    box.copy(action = null)
-                                } else {
-                                    box.copy(action = "removed")
-                                }
+                                grains[tappedIndex] = toggleGrainBoxAction(grains[tappedIndex])
                             } else {
-                                // Spec: new box at (imageX, imageY), fixed 24x24
-                                grains.add(
-                                    GrainBox(
-                                        x = imageX.toInt(),
-                                        y = imageY.toInt(),
-                                        width = NEW_BOX_SIZE,
-                                        height = NEW_BOX_SIZE,
-                                        confidence = null,
-                                        action = "added"
-                                    )
-                                )
+                                grains.add(createAddedGrainBox(imageX, imageY))
                             }
                         }
                     }
@@ -173,15 +154,7 @@ fun CorrectionScreen(
             Button(
                 enabled = weightText.isNotBlank(),
                 onClick = {
-                    // Backend's example confirmedGrains payload shows
-                    // untouched boxes as action: "kept", not null. Convert
-                    // here at the correction -> submit boundary so the
-                    // Canvas color logic above can keep treating null as
-                    // simply "untouched/blue" without a separate case.
-                    val confirmed = grains.map {
-                        if (it.action == null) it.copy(action = "kept") else it
-                    }
-                    onSubmit(confirmed, weightText)
+                    onSubmit(prepareGrainsForSubmission(grains), weightText)
                 }
             ) {
                 Text("Confirm")
