@@ -1,6 +1,7 @@
 package com.grainmvp.android.network
 
 import com.grainmvp.android.BuildConfig
+import android.util.Log
 import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
@@ -39,6 +40,8 @@ object RetrofitClient {
     }
 
     val apiService: ApiService by lazy {
+        // Log the effective base URL at startup to help debug which URL the app is using
+        Log.i("RetrofitClient", "Using backend base URL: $normalizedBaseUrl")
         Retrofit.Builder()
             .baseUrl(normalizedBaseUrl)
             .client(okHttpClient)

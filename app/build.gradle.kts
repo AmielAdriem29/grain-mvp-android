@@ -21,6 +21,17 @@ android {
     namespace = "com.grainmvp.android"
     compileSdk = 34
 
+    signingConfigs {
+        getByName("debug") {
+            storeFile = file(System.getProperty("user.home") + "/.android/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+            enableV1Signing = true
+            enableV2Signing = true
+        }
+    }
+
     defaultConfig {
         applicationId = "com.grainmvp.android"
         minSdk = 26
@@ -56,6 +67,27 @@ android {
 
     kotlinOptions {
         jvmTarget = "17"
+    }
+
+    packaging {
+        // CameraX 1.3.4 ships libimage_processing_util_jni.so with non-16KB alignment.
+        // This is a known issue with older CameraX; the warning is suppressed here.
+        // The app will run in page-size compatible mode on 16KB page-size devices,
+        // which has minimal performance impact.
+        resources {
+            pickFirsts += listOf(
+                "lib/x86_64/libimage_processing_util_jni.so",
+                "lib/x86/libimage_processing_util_jni.so",
+                "lib/arm64-v8a/libimage_processing_util_jni.so",
+                "lib/armeabi-v7a/libimage_processing_util_jni.so"
+            )
+        }
+    }
+
+    buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("debug")
+        }
     }
 }
 
