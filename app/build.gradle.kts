@@ -21,6 +21,17 @@ android {
     namespace = "com.grainmvp.android"
     compileSdk = 34
 
+    signingConfigs {
+        getByName("debug") {
+            storeFile = file(System.getProperty("user.home") + "/.android/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+            enableV1Signing = true
+            enableV2Signing = true
+        }
+    }
+
     defaultConfig {
         applicationId = "com.grainmvp.android"
         minSdk = 26
@@ -70,6 +81,12 @@ android {
                 "lib/arm64-v8a/libimage_processing_util_jni.so",
                 "lib/armeabi-v7a/libimage_processing_util_jni.so"
             )
+        }
+    }
+
+    buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
 }
