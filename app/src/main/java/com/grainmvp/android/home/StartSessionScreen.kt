@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.sp
 import com.grainmvp.android.R
 import com.grainmvp.android.ui.components.BlueprintFrame
 import com.grainmvp.android.ui.components.PrimaryActionButton
+import com.grainmvp.android.ui.components.SecondaryActionButton
 import com.grainmvp.android.ui.theme.AccentGreen
 import com.grainmvp.android.ui.theme.Accent700
 import com.grainmvp.android.ui.theme.Neutral600
@@ -44,14 +45,18 @@ import com.grainmvp.android.ui.theme.TextPrimaryGranular
  * (submit/SubmitScreen.kt), it's a read-only confirmation of these two
  * values, not a form -- see MainActivity's Screen.StartSession wiring.
  *
- * "Backend reachable" / "N queued" is static display text, not a real
- * connectivity check or offline submission queue -- neither exists in
- * this app, and SPEC.md explicitly excludes duplicate-submission /
- * queueing logic as out of scope. Documented in docs/IMPLEMENTATION.md.
+ * "Backend reachable" is still static display text -- there's no real
+ * connectivity check in this app, and SPEC.md explicitly excludes that
+ * kind of logic as out of scope. [queuedCount], though, is real: it's
+ * `MainActivity`'s in-memory `replicateQueue` size, and [onSendQueued]
+ * actually retries every queued submission (see `sendQueuedReplicates`
+ * in MainActivity.kt). Documented in docs/IMPLEMENTATION.md.
  */
 @Composable
 fun StartSessionScreen(
     defaultTechnicianName: String,
+    queuedCount: Int,
+    onSendQueued: () -> Unit,
     onStartScan: (technicianName: String, sampleId: String) -> Unit
 ) {
     var technicianName by remember { mutableStateOf(defaultTechnicianName) }
@@ -148,7 +153,17 @@ fun StartSessionScreen(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Text("Backend reachable", fontSize = 12.sp, color = Neutral600)
-            Text("0 queued", fontSize = 12.sp, color = Neutral600)
+            Text("$queuedCount queued", fontSize = 12.sp, color = Neutral600)
+        }
+
+        if (queuedCount > 0) {
+            SecondaryActionButton(
+                text = "Send $queuedCount queued",
+                onClick = onSendQueued,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 10.dp)
+            )
         }
     }
 }

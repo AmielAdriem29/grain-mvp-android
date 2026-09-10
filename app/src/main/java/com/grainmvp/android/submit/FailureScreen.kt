@@ -38,12 +38,12 @@ import com.grainmvp.android.ui.theme.TextPrimaryGranular
  * brief; everything else falls back to a generic sentence -- see
  * [friendlyErrorMessage].
  *
- * Honesty note (see docs/IMPLEMENTATION.md, dated section): "Keep on
- * device" cannot literally hold this sample for a later automatic
- * retry -- this app has no persistent local queue. [onKeepOnDevice] is
- * wired by the caller to just end the attempt and return to Welcome,
- * the same as today's lack of a retry queue. Flagged as a real UX gap
- * worth a follow-up conversation with whoever specced "send it later."
+ * [onKeepOnDevice] is wired by the caller (SubmitScreen) to queue this
+ * submission in `MainActivity`'s in-memory `replicateQueue`, then
+ * continue to the next sample -- see `submit/ReplicateQueue.kt`. That
+ * queue is in-memory only for now: it's lost if the app is killed. A
+ * durable, disk-backed version that survives an app restart is tracked
+ * as follow-up work (see docs/IMPLEMENTATION.md).
  */
 @Composable
 fun FailureScreen(

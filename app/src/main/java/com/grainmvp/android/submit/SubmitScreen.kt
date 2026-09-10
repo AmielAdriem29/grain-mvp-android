@@ -30,9 +30,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.grainmvp.android.network.GrainBox
 import com.grainmvp.android.network.ReplicateResponse
-import com.grainmvp.android.network.RetrofitClient
-import com.grainmvp.android.network.toImagePart
-import com.grainmvp.android.network.toTextPart
 import com.grainmvp.android.session.incrementSampleId
 import com.grainmvp.android.ui.components.BlueprintFrame
 import com.grainmvp.android.ui.components.PrimaryActionButton
@@ -44,8 +41,6 @@ import com.grainmvp.android.ui.theme.Neutral700
 import com.grainmvp.android.ui.theme.SurfaceBg
 import com.grainmvp.android.ui.theme.TextPrimaryGranular
 import kotlinx.coroutines.launch
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 
 /**
  * Screen 06 (Submit) of the GRANULAR field redesign, plus the state
@@ -76,7 +71,11 @@ fun SubmitScreen(
     confirmedGrains: List<GrainBox>,
     weight: String,
     onEndSession: () -> Unit,
-    onNextSample: (technicianName: String, nextSampleId: String) -> Unit
+    onNextSample: (technicianName: String, nextSampleId: String) -> Unit,
+    // Called with everything needed to retry this submission later, once
+    // the technician taps "Keep on device" on the Failure screen -- see
+    // MainActivity's replicateQueue and ReplicateQueue.kt.
+    onKeepOnDevice: (QueuedReplicate) -> Unit
 ) {
     var state by remember { mutableStateOf<SubmitState>(SubmitState.Form) }
     val scope = rememberCoroutineScope()
@@ -85,17 +84,8 @@ fun SubmitScreen(
         state = SubmitState.Loading
         scope.launch {
             try {
-                val response = RetrofitClient.apiService.submitReplicate(
-                    image = image.toImagePart(),
-                    technicianName = technicianName.toTextPart(),
-                    sampleId = sampleId.toTextPart(),
-                    // Spec: aiPredictedGrains/confirmedGrains are JSON
-                    // STRINGS inside multipart text fields, not real
-                    // JSON bodies, since the whole request is
-                    // multipart/form-data.
-                    aiPredictedGrains = Json.encodeToString(aiPredictedGrains).toTextPart(),
-                    confirmedGrains = Json.encodeToString(confirmedGrains).toTextPart(),
-                    weight = weight.toTextPart()
+                val response = submitQueuedReplicate(
+                    QueuedReplicate(image, technicianName, sampleId, aiPredictedGrains, confirmedGrains, weight)
                 )
                 state = SubmitState.Success(response)
             } catch (e: Exception) {
@@ -127,12 +117,11 @@ fun SubmitScreen(
                 sampleId = sampleId,
                 confirmedGrainCount = confirmedGrains.size,
                 onRetry = { submit() },
-                // Honesty note (see docs/IMPLEMENTATION.md): this app has
-                // no persistent local queue, so "Keep on device" cannot
-                // literally hold the sample for a later automatic send.
-                // It ends this attempt and returns to Welcome, same as
-                // "End session" elsewhere.
-                onKeepOnDevice = onEndSession
+                onKeepOnDevice = {
+                    onKeepOnDevice(
+                        QueuedReplicate(image, technicianName, sampleId, aiPredictedGrains, confirmedGrains, weight)
+                    )
+                }
             )
         }
         else -> {

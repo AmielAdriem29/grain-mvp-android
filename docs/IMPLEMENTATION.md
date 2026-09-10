@@ -414,6 +414,46 @@ Worth remembering for anywhere else this codebase reaches for
 `graphicsLayer` with a scale/translation and expects it to stay
 contained: the clip belongs on the parent, not the scaled node.
 
+## 2026-09 — "Keep on device" actually implemented
+
+Earlier in this same redesign, "Keep on device" (Failure screen) was
+flagged as copy describing functionality that didn't exist -- this app
+had zero persistence infrastructure anywhere (confirmed by search: no
+Room, no DataStore, no file storage), and `docs/SPEC.md` explicitly
+never required a retry queue (*"Do not build any special
+duplicate-prevention logic... this is expected and accepted"*). The app
+owner asked for it to be built for real. Scope, decided explicitly
+rather than assumed:
+
+- **In-memory only**, not disk-backed -- lost if the app is killed. A
+  durable version that survives an app restart is intentionally
+  deferred; the app owner will file a follow-up issue for it after this
+  PR.
+- **Multiple items queued**, not just the most recent failure -- a
+  technician might hit a dead zone and keep scanning several samples
+  before connectivity returns.
+- **Manual retry**, not automatic background sync -- a "Send N queued"
+  button, not a scheduled job.
+
+Implementation: `submit/ReplicateQueue.kt` holds the `QueuedReplicate`
+data class (everything a resubmission needs: image, technician, sample
+ID, both grain lists, weight) and `submitQueuedReplicate()`, the same
+`POST /api/replicate` call `SubmitScreen`'s own submit flow now also
+calls through, so the multipart/JSON-encoding logic exists in exactly
+one place. `MainActivity` owns the actual queue
+(`mutableStateListOf<QueuedReplicate>`) since it needs to survive
+navigating between screens; tapping "Keep on device" adds to it and
+continues to the *next* sample (same technician, incremented ID, per
+the Failure screen's own copy: "...or keep scanning and send it
+later") rather than ending the session. `sendQueuedReplicates()`
+(MainActivity.kt) attempts each queued item in order on the "Send N
+queued" button (now shown for real on Start Session, replacing the
+previously-static "N queued" text), removing whatever succeeds and
+leaving the rest queued for next time.
+
+Not independently verified end-to-end against a real backend -- no
+Android SDK in this environment, same limitation as every phase above.
+
 ## Cross-cutting notes (apply to every phase)
 
 - **Single coordinate space.** Every `GrainBox` everywhere in this app
