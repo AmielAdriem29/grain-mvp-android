@@ -302,6 +302,7 @@ fun CorrectionScreen(
                 text = "Confirm $confirmedCount",
                 enabled = isValidWeightValue(weightText),
                 onClick = { onSubmit(prepareGrainsForSubmission(grains), weightText) },
+                height = 52.dp,
                 modifier = Modifier.weight(1.4f)
             )
         }

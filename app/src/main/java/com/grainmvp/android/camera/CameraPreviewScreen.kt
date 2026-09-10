@@ -50,6 +50,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathOperation
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -588,11 +589,12 @@ private fun ReviewScreen(sampleId: String, image: Bitmap, onRetake: () -> Unit, 
             Image(
                 bitmap = image.asImageBitmap(),
                 contentDescription = "Captured rice sample",
+                contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()
             )
         }
 
-        Column(modifier = Modifier.padding(20.dp)) {
+        Column(modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 14.dp, bottom = 20.dp)) {
             Text(
                 "BEFORE CLASSIFYING",
                 fontFamily = FontFamily.SansSerif,
@@ -615,7 +617,12 @@ private fun ReviewScreen(sampleId: String, image: Bitmap, onRetake: () -> Unit, 
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             SecondaryActionButton(text = "Retake", onClick = onRetake, modifier = Modifier.weight(1f))
-            PrimaryActionButton(text = "Detect grains", onClick = onContinue, modifier = Modifier.weight(1.4f))
+            PrimaryActionButton(
+                text = "Detect grains",
+                onClick = onContinue,
+                height = 52.dp,
+                modifier = Modifier.weight(1.4f)
+            )
         }
     }
 }
