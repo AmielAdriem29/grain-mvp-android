@@ -4,10 +4,12 @@ import android.graphics.Bitmap
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -17,7 +19,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.grainmvp.android.camera.CameraPreviewScreen
 import com.grainmvp.android.correction.CorrectionScreen
 import com.grainmvp.android.dev.FAKE_GRAINS_FOR_DEV_ONLY
@@ -117,13 +123,27 @@ fun GrainMvpApp() {
                             )
                         }
 
-                        Button(
-                            onClick = { showNetworkTest = !showNetworkTest },
+                        // Styled to match the rest of the capture chrome
+                        // (GRID/LAMP: bordered dark pill, uppercase label)
+                        // rather than a default Material button, since this
+                        // sits directly over that same screen.
+                        Box(
                             modifier = Modifier
                                 .align(Alignment.TopEnd)
                                 .padding(8.dp)
+                                .background(Color.Black.copy(alpha = 0.72f))
+                                .border(1.dp, Color.White.copy(alpha = 0.35f))
+                                .clickable { showNetworkTest = !showNetworkTest }
+                                .padding(horizontal = 12.dp, vertical = 8.dp)
                         ) {
-                            Text(if (showNetworkTest) "Camera" else "Network Test")
+                            Text(
+                                if (showNetworkTest) "CAMERA" else "NETWORK TEST",
+                                color = Color.White,
+                                fontFamily = FontFamily.SansSerif,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 12.sp,
+                                letterSpacing = 0.8.sp
+                            )
                         }
                     }
                 }
