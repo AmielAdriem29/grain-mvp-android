@@ -184,4 +184,65 @@ class CorrectionLogicTest {
     fun `whitespace-only is invalid`() {
         assertEquals(false, isValidWeightValue("   "))
     }
+
+    // ---- applyGrainTap (screen 05's explicit Remove/Add mode) ----
+
+    @Test
+    fun `remove mode tapping an untouched box marks it removed`() {
+        val grains = listOf(
+            GrainBox(x = 100, y = 100, width = 24, height = 24, confidence = 0.8f, action = null)
+        )
+
+        val result = applyGrainTap(grains, imageX = 110f, imageY = 110f, mode = GrainCorrectionMode.REMOVE)
+
+        assertEquals("removed", result[0].action)
+    }
+
+    @Test
+    fun `remove mode tapping an already-removed box un-removes it`() {
+        val grains = listOf(
+            GrainBox(x = 100, y = 100, width = 24, height = 24, confidence = 0.8f, action = "removed")
+        )
+
+        val result = applyGrainTap(grains, imageX = 110f, imageY = 110f, mode = GrainCorrectionMode.REMOVE)
+
+        assertNull(result[0].action)
+    }
+
+    @Test
+    fun `remove mode tapping empty space does nothing`() {
+        val grains = listOf(
+            GrainBox(x = 100, y = 100, width = 24, height = 24, confidence = 0.8f, action = null)
+        )
+
+        val result = applyGrainTap(grains, imageX = 500f, imageY = 500f, mode = GrainCorrectionMode.REMOVE)
+
+        assertEquals(grains, result)
+    }
+
+    @Test
+    fun `add mode tapping empty space adds a new box`() {
+        val grains = listOf(
+            GrainBox(x = 100, y = 100, width = 24, height = 24, confidence = 0.8f, action = null)
+        )
+
+        val result = applyGrainTap(grains, imageX = 500f, imageY = 500f, mode = GrainCorrectionMode.ADD)
+
+        assertEquals(2, result.size)
+        assertEquals("added", result[1].action)
+        assertEquals(500, result[1].x)
+        assertEquals(500, result[1].y)
+    }
+
+    @Test
+    fun `add mode tapping an existing box does nothing`() {
+        val grains = listOf(
+            GrainBox(x = 100, y = 100, width = 24, height = 24, confidence = 0.8f, action = null)
+        )
+
+        val result = applyGrainTap(grains, imageX = 110f, imageY = 110f, mode = GrainCorrectionMode.ADD)
+
+        assertEquals(grains, result)
+        assertEquals(1, result.size)
+    }
 }

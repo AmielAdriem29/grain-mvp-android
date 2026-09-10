@@ -21,33 +21,40 @@ import androidx.compose.ui.unit.dp
 import com.grainmvp.android.camera.CameraPreviewScreen
 import com.grainmvp.android.correction.CorrectionScreen
 import com.grainmvp.android.dev.FAKE_GRAINS_FOR_DEV_ONLY
-import com.grainmvp.android.home.HomeScreen
+import com.grainmvp.android.home.StartSessionScreen
+import com.grainmvp.android.home.WelcomeScreen
 import com.grainmvp.android.network.GrainBox
 import com.grainmvp.android.network.NetworkTestScreen
 import com.grainmvp.android.submit.SubmitScreen
 import com.grainmvp.android.ui.theme.GrainMvpTheme
 
 /**
- * Entry point. Screens are swapped in per phase branch:
- *  - Phase 1: live camera preview (done)
- *  - Phase 3: correction screen (done)
- *  - Phase 4: submit flow (done)
- *  - Phase 5 polish: Home screen added, shown first so the camera
- *    permission dialog only appears once the user intentionally starts
- *    a scan, not the instant the app launches.
+ * Entry point. Screens are swapped in per phase branch; as of the
+ * GRANULAR field redesign (2026-09), the flow is:
+ *  - Welcome (opening splash)
+ *  - Start Session (technician + sample ID -- collected once here, not
+ *    on Submit anymore)
+ *  - Capture -> Correction -> Submit, all carrying technicianName/
+ *    sampleId through as plain parameters
+ *  - Submit's Result screen's "Next sample" skips straight back to
+ *    Capture with the same technician and an incremented sample ID,
+ *    bypassing Start Session
  *
  * Screen state is a simple sealed class rather than a real navigation
  * library, since there are still only a handful of screens.
  */
 private sealed class Screen {
-    data object Home : Screen()
-    data object Capture : Screen()
-    data class Correction(val image: Bitmap) : Screen()
+    data object Welcome : Screen()
+    data object StartSession : Screen()
+    data class Capture(val technicianName: String, val sampleId: String) : Screen()
+    data class Correction(val image: Bitmap, val technicianName: String, val sampleId: String) : Screen()
     data class Submit(
         val image: Bitmap,
         val aiPredictedGrains: List<GrainBox>,
         val confirmedGrains: List<GrainBox>,
-        val weight: String
+        val weight: String,
+        val technicianName: String,
+        val sampleId: String
     ) : Screen()
 }
 
@@ -62,7 +69,12 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun GrainMvpApp() {
-    var screen by remember { mutableStateOf<Screen>(Screen.Home) }
+    var screen by remember { mutableStateOf<Screen>(Screen.Welcome) }
+
+    // Simple in-memory default (no persistence needed) so returning to
+    // Start Session after ending a session pre-fills the last-used
+    // technician name, per the redesign brief.
+    var lastTechnicianName by remember { mutableStateOf("") }
 
     // TEMPORARY debug toggle to reach NetworkTestScreen (throwaway,
     // see network/NetworkTestScreen.kt). Only available from the
@@ -73,8 +85,18 @@ fun GrainMvpApp() {
     GrainMvpTheme {
         Surface(modifier = Modifier.fillMaxSize()) {
             when (val currentScreen = screen) {
-                is Screen.Home -> {
-                    HomeScreen(onStart = { screen = Screen.Capture })
+                is Screen.Welcome -> {
+                    WelcomeScreen(onStart = { screen = Screen.StartSession })
+                }
+
+                is Screen.StartSession -> {
+                    StartSessionScreen(
+                        defaultTechnicianName = lastTechnicianName,
+                        onStartScan = { technicianName, sampleId ->
+                            lastTechnicianName = technicianName
+                            screen = Screen.Capture(technicianName, sampleId)
+                        }
+                    )
                 }
 
                 is Screen.Capture -> {
@@ -83,8 +105,14 @@ fun GrainMvpApp() {
                             NetworkTestScreen()
                         } else {
                             CameraPreviewScreen(
+                                technicianName = currentScreen.technicianName,
+                                sampleId = currentScreen.sampleId,
                                 onImageConfirmed = { bitmap ->
-                                    screen = Screen.Correction(bitmap)
+                                    screen = Screen.Correction(
+                                        image = bitmap,
+                                        technicianName = currentScreen.technicianName,
+                                        sampleId = currentScreen.sampleId
+                                    )
                                 }
                             )
                         }
@@ -109,7 +137,9 @@ fun GrainMvpApp() {
                         // call the real endpoint instead once Sitoy's server
                         // is reachable.
                         initialGrains = FAKE_GRAINS_FOR_DEV_ONLY,
-                        onRetakePhoto = { screen = Screen.Capture },
+                        onRetakePhoto = {
+                            screen = Screen.Capture(currentScreen.technicianName, currentScreen.sampleId)
+                        },
                         onSubmit = { confirmedGrains, weight ->
                             screen = Screen.Submit(
                                 image = currentScreen.image,
@@ -119,7 +149,9 @@ fun GrainMvpApp() {
                                 // the same fake data, until Phase 2 is real.
                                 aiPredictedGrains = FAKE_GRAINS_FOR_DEV_ONLY,
                                 confirmedGrains = confirmedGrains,
-                                weight = weight
+                                weight = weight,
+                                technicianName = currentScreen.technicianName,
+                                sampleId = currentScreen.sampleId
                             )
                         }
                     )
@@ -127,11 +159,17 @@ fun GrainMvpApp() {
 
                 is Screen.Submit -> {
                     SubmitScreen(
+                        technicianName = currentScreen.technicianName,
+                        sampleId = currentScreen.sampleId,
                         image = currentScreen.image,
                         aiPredictedGrains = currentScreen.aiPredictedGrains,
                         confirmedGrains = currentScreen.confirmedGrains,
                         weight = currentScreen.weight,
-                        onDone = { screen = Screen.Home }
+                        onEndSession = { screen = Screen.Welcome },
+                        onNextSample = { technicianName, nextSampleId ->
+                            lastTechnicianName = technicianName
+                            screen = Screen.Capture(technicianName, nextSampleId)
+                        }
                     )
                 }
             }

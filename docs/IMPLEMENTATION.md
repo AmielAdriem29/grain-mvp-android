@@ -211,6 +211,113 @@ since real work happened and future contributors should know about it.
 - SampleType as free text vs. dropdown — no list of valid rice varieties provided yet
 - Phase 2/4's real backend verification — still blocked on Sitoy
 
+## 2026-09 — GRANULAR field redesign (UX pass, not a spec change)
+
+A Claude Design session produced HTML mockups of 8 redesigned screens
+(`project/GRANULAR Field Redesign.dc.html` in the design repo) and this
+phase recreated them as native Compose code. Same two endpoints, same
+1024×1024 coordinate space, same `GrainBox` field names as SPEC.md --
+this is a visual/UX pass, not a backend or contract change. Substantive
+behavior changes:
+
+1. **Technician name + sample ID moved earlier.** Collected on the new
+   `home/StartSessionScreen.kt` (screen 02), right after the opening
+   splash, instead of on Submit. By the time the technician reaches
+   `submit/SubmitScreen.kt`, those two fields are a read-only summary,
+   not a form. `MainActivity.kt`'s `Screen` sealed class now threads
+   `technicianName`/`sampleId` through `Capture` → `Correction` →
+   `Submit`.
+2. **Correction screen (`correction/CorrectionScreen.kt`, screen 05)**
+   gets a live running count (AI detected / you removed / you added,
+   computed reactively), an explicit Remove/Add mode
+   (`GrainCorrectionMode` in `correction/CorrectionLogic.kt`) so a tap
+   is never ambiguous, and box states distinguished by line style, not
+   just color, for colorblind accessibility: solid blue = detected,
+   white dashed = removed, thick dark with a white halo = added. New
+   pure logic (`applyGrainTap`) is unit tested in
+   `CorrectionLogicTest.kt` alongside the existing tap-logic tests.
+3. **Failure screen (`submit/FailureScreen.kt`, screen 07)** replaces
+   the raw `"${exceptionClassName}: ${message}"` string with a
+   plain-language sentence, keeping the raw exception class name +
+   endpoint in small print underneath for support purposes.
+4. **App renamed GRANULAR** -- `res/values/strings.xml`'s `app_name`,
+   plus the wordmark on every redesigned screen. Logo asset copied to
+   `res/drawable/granular_logo.png`.
+5. **Camera screen (`camera/CameraPreviewScreen.kt`, screen 03)** keeps
+   all CameraX/crop-math logic (`camera/CropMath.kt`, untouched) and
+   only changes the decorative overlay: green accent corner brackets
+   instead of a plain guide rectangle, a session-context pill + a real
+   torch toggle (wired to `Camera.cameraControl.enableTorch`, guarded
+   by `cameraInfo.hasFlashUnit()`), a decorative grid toggle, and the
+   gallery button (previously present but buried) surfaced into the
+   bottom control row alongside the shutter.
+
+New reusable components: `ui/components/BlueprintFrame.kt` (the
+bordered, corner-ticked "blueprint" card used on Start Session, Submit,
+Failure, and Result) and `ui/components/AppButtons.kt`
+(`PrimaryActionButton`/`SecondaryActionButton`, square-cornered,
+matching the design system). New design tokens added to
+`ui/theme/Color.kt` (accent scale, neutral scale, divider, detection
+colors, failure/result card colors) rather than hardcoding hex per
+screen. `ui/theme/Theme.kt` now overrides every Material3 shape slot to
+a 0dp-radius `RoundedCornerShape` (Material3's `Shapes` class requires
+`CornerBasedShape`, which the plain `RectangleShape` object does not
+implement) so stock Material components default to square corners too.
+
+**Deviations from the design mockups (documented, not silent):**
+
+1. **Typography.** The design specifies "Barlow Condensed" (headings)
+   and "Barlow" (body) via Google Fonts. There is no offline font file
+   bundled in this app and no `ui-text-google-fonts` (downloadable
+   fonts) dependency in `app/build.gradle.kts`. Rather than add a new
+   font dependency I could not verify compiles in this environment (no
+   Android SDK available -- see below), every redesigned screen
+   approximates the look with `FontFamily.SansSerif` plus bold/semibold
+   weights and generous `letterSpacing`, especially on the uppercase
+   "eyebrow" labels, which carries most of the "condensed industrial"
+   feel even without the exact typeface.
+2. **"Backend reachable" / "N queued" on Start Session
+   (`home/StartSessionScreen.kt`) are static display text**, not wired
+   to a real connectivity check or an offline submission queue. Neither
+   exists anywhere in this app, and SPEC.md explicitly says
+   duplicate-submission/queueing logic is not required for the MVP.
+   Building either would be new functionality out of scope for a UI
+   redesign.
+3. **"Keep on device" on the Failure screen
+   (`submit/FailureScreen.kt`) does not actually persist the sample for
+   a later automatic retry.** This app has no local persistence layer.
+   The button currently just ends the current attempt and returns to
+   Welcome -- functionally identical to today's lack of a retry queue,
+   despite the copy ("...or keep scanning and send it later") implying
+   more. This is a real UX gap, not just a technical footnote -- it's
+   worth a follow-up conversation with whoever specced that copy before
+   shipping it, since a technician reading "send it later" would
+   reasonably expect the app to actually do that.
+4. **Result screen's total grain count is derived, not
+   backend-supplied.** `POST /api/replicate`'s response
+   (`ReplicateResponse` in `network/ApiModels.kt`) has no total-grain
+   field. `submit/ResultScreen.kt` computes
+   `totalGrains = round(confirmedGrainCount / (percentage / 100.0))` --
+   exact algebra from `percentage`'s own definition
+   (`immature/total × 100`), not a guess, but flagged here since it's
+   derived client-side rather than sent by the server.
+
+**Not a deviation, but worth noting:** `ui/components/AppHeader.kt`
+(the old branded header bar) has no remaining callers -- none of the
+redesigned screens use it, since each screen in the mockups has its own
+bespoke header. Left in place rather than deleted, per the same
+"unverified compile, don't take a destructive action I can't check"
+reasoning as the font dependency above; a future cleanup pass can
+remove it once someone can actually build the app.
+
+**Compilation was not verified.** There is no Android SDK in this
+environment, so `./gradlew build` could not be run. Every file touched
+in this phase was re-read after writing for import correctness and
+Compose API usage against the exact APIs already in use elsewhere in
+this codebase, but this phase should be built once before merging.
+
+---
+
 ## Cross-cutting notes (apply to every phase)
 
 - **Single coordinate space.** Every `GrainBox` everywhere in this app

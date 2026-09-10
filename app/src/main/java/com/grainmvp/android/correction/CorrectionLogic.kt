@@ -90,3 +90,52 @@ fun isValidWeightValue(value: String): Boolean {
     val parsed = value.toDoubleOrNull() ?: return false
     return parsed > 0
 }
+
+/**
+ * Screen 05 (Review & correct) of the GRANULAR field redesign replaces
+ * the old always-toggle-or-add tap behavior with an explicit mode, so a
+ * tap is never ambiguous about what it will do.
+ */
+enum class GrainCorrectionMode { REMOVE, ADD }
+
+/**
+ * Applies a tap at (imageX, imageY) to [grains] given the current
+ * [mode]:
+ *  - REMOVE mode: tapping an existing box toggles it kept/removed (via
+ *    [toggleGrainBoxAction]); tapping empty space does nothing.
+ *  - ADD mode: tapping empty space adds a new 24x24 box (via
+ *    [createAddedGrainBox]); tapping an existing box does nothing.
+ *
+ * Returns [grains] unchanged (same list reference) when the tap has no
+ * effect, or a new list when something changed -- callers can compare
+ * by reference to know whether to update their UI state.
+ *
+ * Pure and framework-free like the rest of this file's tap logic, so it
+ * can be unit tested directly (see CorrectionLogicTest.kt).
+ */
+fun applyGrainTap(
+    grains: List<GrainBox>,
+    imageX: Float,
+    imageY: Float,
+    mode: GrainCorrectionMode
+): List<GrainBox> {
+    val tappedIndex = findTappedBoxIndex(grains, imageX, imageY)
+    return when (mode) {
+        GrainCorrectionMode.REMOVE -> {
+            if (tappedIndex < 0) {
+                grains
+            } else {
+                grains.toMutableList().also {
+                    it[tappedIndex] = toggleGrainBoxAction(it[tappedIndex])
+                }
+            }
+        }
+        GrainCorrectionMode.ADD -> {
+            if (tappedIndex >= 0) {
+                grains
+            } else {
+                grains + createAddedGrainBox(imageX, imageY)
+            }
+        }
+    }
+}
