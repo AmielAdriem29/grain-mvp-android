@@ -23,6 +23,15 @@ import com.grainmvp.android.ui.theme.DividerColor
  * every primary button). Implemented as a Modifier rather than requiring
  * [BlueprintFrame] specifically, so [PrimaryActionButton] can reuse the
  * exact same corner-drawing code without a wrapper Composable.
+ *
+ * Each tick is inset by half the stroke width from the edge.
+ * `drawLine` centers its stroke on the path it's given, so a tick drawn
+ * exactly at the boundary (x/y == 0 or w/h) bleeds half its stroke width
+ * outside the element's own bounds -- nothing here clips a `drawWithContent`
+ * overlay back to those bounds. That bleed is what made a primary button
+ * with corner ticks look visibly bigger/uneven next to a secondary button
+ * without them, even at an identical `Modifier.height`. Insetting keeps
+ * the full visual stroke inside [0, w] x [0, h].
  */
 fun Modifier.blueprintCorners(
     color: Color,
@@ -32,21 +41,22 @@ fun Modifier.blueprintCorners(
     drawContent()
     val len = length.toPx()
     val sw = strokeWidth.toPx()
+    val inset = sw / 2f
     val w = size.width
     val h = size.height
 
     // top-left
-    drawLine(color, Offset(0f, 0f), Offset(len, 0f), sw)
-    drawLine(color, Offset(0f, 0f), Offset(0f, len), sw)
+    drawLine(color, Offset(inset, inset), Offset(len, inset), sw)
+    drawLine(color, Offset(inset, inset), Offset(inset, len), sw)
     // top-right
-    drawLine(color, Offset(w, 0f), Offset(w - len, 0f), sw)
-    drawLine(color, Offset(w, 0f), Offset(w, len), sw)
+    drawLine(color, Offset(w - inset, inset), Offset(w - len, inset), sw)
+    drawLine(color, Offset(w - inset, inset), Offset(w - inset, len), sw)
     // bottom-left
-    drawLine(color, Offset(0f, h), Offset(len, h), sw)
-    drawLine(color, Offset(0f, h), Offset(0f, h - len), sw)
+    drawLine(color, Offset(inset, h - inset), Offset(len, h - inset), sw)
+    drawLine(color, Offset(inset, h - inset), Offset(inset, h - len), sw)
     // bottom-right
-    drawLine(color, Offset(w, h), Offset(w - len, h), sw)
-    drawLine(color, Offset(w, h), Offset(w, h - len), sw)
+    drawLine(color, Offset(w - inset, h - inset), Offset(w - len, h - inset), sw)
+    drawLine(color, Offset(w - inset, h - inset), Offset(w - inset, h - len), sw)
 }
 
 /**
