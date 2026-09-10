@@ -301,6 +301,20 @@ private fun CaptureScreen(sampleId: String, onCaptured: (Bitmap) -> Unit, onPick
                                 gridStroke
                             )
                         }
+
+                        // Circle inscribed in the guide square (touching
+                        // the midpoint of each edge) -- a petri dish is
+                        // round, so a round alignment aid centers it more
+                        // directly than the rule-of-thirds lines alone.
+                        // Same toggle as the grid lines rather than a
+                        // separate button, since both are capture-framing
+                        // aids and the bottom row only has three cells.
+                        drawCircle(
+                            color = CaptureAccentGreen.copy(alpha = 0.7f),
+                            radius = guideSize / 2f,
+                            center = Offset(guideLeft + guideSize / 2f, guideTop + guideSize / 2f),
+                            style = Stroke(width = 1.5.dp.toPx())
+                        )
                     }
                 }
 
