@@ -2,8 +2,11 @@ package com.grainmvp.android.ui.components
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -23,6 +26,14 @@ import com.grainmvp.android.ui.theme.TextPrimaryGranular
  * filled accent-green, with the corner-tick "blueprint" styling every
  * primary button in the mockups carries. One reusable composable instead
  * of repeating this Button/Modifier chain on every screen.
+ *
+ * [loading] shows a small spinner ahead of [text] and disables the
+ * button, *inside* its fixed [height] -- a separate loading indicator
+ * placed below the button changes the Column's total content height
+ * while loading, which visibly shifts every sibling below a weighted
+ * Spacer each time loading starts/stops (see Submit screen's history).
+ * Keeping the spinner inside the button's own unchanging bounds avoids
+ * that reflow entirely.
  */
 @Composable
 fun PrimaryActionButton(
@@ -30,11 +41,12 @@ fun PrimaryActionButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    loading: Boolean = false,
     height: Dp = 56.dp
 ) {
     Button(
         onClick = onClick,
-        enabled = enabled,
+        enabled = enabled && !loading,
         shape = RectangleShape,
         colors = ButtonDefaults.buttonColors(
             containerColor = AccentGreen,
@@ -46,6 +58,13 @@ fun PrimaryActionButton(
             .height(height)
             .blueprintCorners(Color.White.copy(alpha = 0.85f))
     ) {
+        if (loading) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(18.dp).padding(end = 8.dp),
+                color = Color.White,
+                strokeWidth = 2.dp
+            )
+        }
         Text(text, fontWeight = FontWeight.SemiBold, fontSize = 16.sp, letterSpacing = 0.5.sp)
     }
 }
