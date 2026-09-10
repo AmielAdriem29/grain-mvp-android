@@ -7,7 +7,10 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -31,6 +34,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.graphicsLayer
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -38,7 +42,9 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.PointerEvent
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -60,19 +66,35 @@ import com.grainmvp.android.ui.theme.TextPrimaryGranular
 
 private const val IMAGE_SIZE = 1024
 
+/** Zoom range: 1x (fit-to-width, no zoom) up to 4x -- close enough to make
+ *  individual grains easy to tap without losing track of where you are
+ *  on the tray. */
+private const val MIN_ZOOM = 1f
+private const val MAX_ZOOM = 4f
+
+/** Multiplier applied per tap of the floating +/- zoom buttons. */
+private const val ZOOM_STEP = 1.5f
+
 /**
  * Screen 05 (Review & correct) of the GRANULAR field redesign.
  *
  * Replaces the old "the weak screen today" version with:
  *  - a live running count: AI detected vs. you removed/added, computed
  *    reactively as confirmedCount = initialGrains.size - removed + added
- *  - an explicit Remove/Add mode (segmented control + floating +/-
- *    buttons over the image), so a tap is never ambiguous about what it
- *    will do -- see [GrainCorrectionMode] / [applyGrainTap] in
- *    CorrectionLogic.kt
+ *  - an explicit Remove/Add mode (the segmented control below the
+ *    image), so a tap is never ambiguous about what it will do -- see
+ *    [GrainCorrectionMode] / [applyGrainTap] in CorrectionLogic.kt
  *  - box states distinguished by line style, not just color, for
  *    colorblind accessibility: solid blue = detected/untouched, white
  *    dashed = removed, thick dark with a white halo = added
+ *  - pinch-to-zoom and pan (single-finger drag once zoomed) on the
+ *    image, so a technician can zoom into a dense cluster of grains
+ *    before tapping -- see the `awaitEachGesture` block below and
+ *    [screenTapToImageCoords] / [clampPan] in CorrectionLogic.kt. The
+ *    floating +/- buttons over the image are discrete zoom steps;
+ *    pinch is the primary way to zoom. There's no separate floating
+ *    mode toggle any more -- the segmented control is the only mode
+ *    switch, so it isn't duplicated.
  */
 @SuppressLint("UnusedBoxWithConstraintsScope")
 @Composable
@@ -88,6 +110,11 @@ fun CorrectionScreen(
     var weightText by remember { mutableStateOf("") }
     var mode by remember { mutableStateOf(GrainCorrectionMode.REMOVE) }
 
+    // Zoom/pan state resets with the image (a "New photo" tap starts
+    // fresh rather than carrying over the old photo's zoom level).
+    var zoom by remember(initialGrains) { mutableStateOf(MIN_ZOOM) }
+    var panOffset by remember(initialGrains) { mutableStateOf(Offset.Zero) }
+
     val aiCount = initialGrains.size
     val removedCount = grains.count { it.action == "removed" }
     val addedCount = grains.count { it.action == "added" }
@@ -99,6 +126,16 @@ fun CorrectionScreen(
             grains.clear()
             grains.addAll(updated)
         }
+    }
+
+    /** Applies a discrete zoom step from the +/- buttons, re-clamping pan to the new zoom level. */
+    fun stepZoom(factor: Float, boxSizePx: Float) {
+        val newZoom = (zoom * factor).coerceIn(MIN_ZOOM, MAX_ZOOM)
+        zoom = newZoom
+        panOffset = Offset(
+            clampPan(panOffset.x, boxSizePx, newZoom),
+            clampPan(panOffset.y, boxSizePx, newZoom)
+        )
     }
 
     Column(
@@ -142,69 +179,132 @@ fun CorrectionScreen(
                 .border(width = 1.dp, color = DividerColor)
         ) {
             val displayScale = constraints.maxWidth.toFloat() / IMAGE_SIZE
+            val boxSizePx = constraints.maxWidth.toFloat()
 
             Box(
                 modifier = Modifier
                     .width(maxWidth)
                     .height(maxWidth)
+                    // A single gesture loop decides tap vs. pinch/pan itself
+                    // (rather than stacking detectTapGestures and
+                    // detectTransformGestures as two independent detectors,
+                    // which is a known source of double-firing/conflicts
+                    // when both watch the same pointer stream). Below the
+                    // touch-slop threshold and with only one pointer down,
+                    // a release commits as a tap; past that threshold, or
+                    // with a second pointer down, it commits as zoom/pan.
                     .pointerInput(displayScale, mode) {
-                        detectTapGestures { tapOffset ->
-                            applyTap(tapOffset.x / displayScale, tapOffset.y / displayScale)
+                        awaitEachGesture {
+                            val down = awaitFirstDown(requireUnconsumed = false)
+                            val touchSlop = viewConfiguration.touchSlop
+                            var isTransforming = false
+                            var accumulatedPan = Offset.Zero
+                            var event: PointerEvent
+                            do {
+                                event = awaitPointerEvent()
+                                val zoomChange = event.calculateZoom()
+                                val panChange = event.calculatePan()
+
+                                if (!isTransforming) {
+                                    accumulatedPan += panChange
+                                    val zoomedEnough = kotlin.math.abs(zoomChange - 1f) > 0.01f
+                                    val pannedEnough = accumulatedPan.getDistance() > touchSlop
+                                    if (zoomedEnough || pannedEnough || event.changes.size > 1) {
+                                        isTransforming = true
+                                    }
+                                }
+
+                                if (isTransforming) {
+                                    val newZoom = (zoom * zoomChange).coerceIn(MIN_ZOOM, MAX_ZOOM)
+                                    zoom = newZoom
+                                    panOffset = Offset(
+                                        clampPan(panOffset.x + panChange.x, boxSizePx, newZoom),
+                                        clampPan(panOffset.y + panChange.y, boxSizePx, newZoom)
+                                    )
+                                    event.changes.forEach { if (it.positionChanged()) it.consume() }
+                                }
+                            } while (event.changes.any { it.pressed })
+
+                            if (!isTransforming) {
+                                val (imageX, imageY) = screenTapToImageCoords(
+                                    screenX = down.position.x,
+                                    screenY = down.position.y,
+                                    boxSizePx = boxSizePx,
+                                    displayScale = displayScale,
+                                    zoom = zoom,
+                                    panX = panOffset.x,
+                                    panY = panOffset.y
+                                )
+                                applyTap(imageX, imageY)
+                            }
                         }
                     }
             ) {
-                Image(
-                    bitmap = image.asImageBitmap(),
-                    contentDescription = "Rice sample",
-                    modifier = Modifier.fillMaxSize()
-                )
-                Canvas(modifier = Modifier.fillMaxSize()) {
-                    grains.forEach { box ->
-                        val topLeft = Offset(box.x * displayScale, box.y * displayScale)
-                        val boxSize = Size(box.width * displayScale, box.height * displayScale)
-                        when (box.action) {
-                            "removed" -> drawRect(
-                                color = Color.White.copy(alpha = 0.85f),
-                                topLeft = topLeft,
-                                size = boxSize,
-                                style = Stroke(
-                                    width = 1.5.dp.toPx(),
-                                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 4f), 0f)
-                                )
-                            )
-                            "added" -> {
-                                val halo = 2.dp.toPx()
-                                drawRect(
-                                    color = Color.White.copy(alpha = 0.8f),
-                                    topLeft = Offset(topLeft.x - halo, topLeft.y - halo),
-                                    size = Size(boxSize.width + halo * 2, boxSize.height + halo * 2),
-                                    style = Stroke(width = 1.dp.toPx())
-                                )
-                                drawRect(
-                                    color = Accent900,
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer(
+                            scaleX = zoom,
+                            scaleY = zoom,
+                            translationX = panOffset.x,
+                            translationY = panOffset.y
+                        )
+                ) {
+                    Image(
+                        bitmap = image.asImageBitmap(),
+                        contentDescription = "Rice sample",
+                        modifier = Modifier.fillMaxSize()
+                    )
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        grains.forEach { box ->
+                            val topLeft = Offset(box.x * displayScale, box.y * displayScale)
+                            val boxSize = Size(box.width * displayScale, box.height * displayScale)
+                            when (box.action) {
+                                "removed" -> drawRect(
+                                    color = Color.White.copy(alpha = 0.85f),
                                     topLeft = topLeft,
                                     size = boxSize,
-                                    style = Stroke(width = 2.dp.toPx())
+                                    style = Stroke(
+                                        width = 1.5.dp.toPx(),
+                                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 4f), 0f)
+                                    )
+                                )
+                                "added" -> {
+                                    val halo = 2.dp.toPx()
+                                    drawRect(
+                                        color = Color.White.copy(alpha = 0.8f),
+                                        topLeft = Offset(topLeft.x - halo, topLeft.y - halo),
+                                        size = Size(boxSize.width + halo * 2, boxSize.height + halo * 2),
+                                        style = Stroke(width = 1.dp.toPx())
+                                    )
+                                    drawRect(
+                                        color = Accent900,
+                                        topLeft = topLeft,
+                                        size = boxSize,
+                                        style = Stroke(width = 2.dp.toPx())
+                                    )
+                                }
+                                else -> drawRect(
+                                    color = DetectionBlue,
+                                    topLeft = topLeft,
+                                    size = boxSize,
+                                    style = Stroke(width = 1.5.dp.toPx())
                                 )
                             }
-                            else -> drawRect(
-                                color = DetectionBlue,
-                                topLeft = topLeft,
-                                size = boxSize,
-                                style = Stroke(width = 1.5.dp.toPx())
-                            )
                         }
                     }
                 }
 
+                // Outside the graphicsLayer Box above, so these stay a
+                // fixed size/position regardless of the image's zoom.
                 Column(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
                         .padding(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    FloatingModeButton(symbol = "+", onClick = { mode = GrainCorrectionMode.ADD })
-                    FloatingModeButton(symbol = "−", onClick = { mode = GrainCorrectionMode.REMOVE })
+                    FloatingZoomButton(symbol = "+", onClick = { stepZoom(ZOOM_STEP, boxSizePx) })
+                    FloatingZoomButton(symbol = "−", onClick = { stepZoom(1f / ZOOM_STEP, boxSizePx) })
                 }
             }
         }
@@ -309,16 +409,22 @@ fun CorrectionScreen(
     }
 }
 
+/**
+ * Discrete zoom in/out step over the image. Smaller and less
+ * conspicuous than the mode-toggle buttons this replaced (44dp) --
+ * pinch is the primary way to zoom, so these are a secondary,
+ * lower-emphasis control, not a primary action.
+ */
 @Composable
-private fun FloatingModeButton(symbol: String, onClick: () -> Unit) {
+private fun FloatingZoomButton(symbol: String, onClick: () -> Unit) {
     Box(
         modifier = Modifier
-            .size(44.dp)
+            .size(32.dp)
             .background(Color.Black.copy(alpha = 0.72f))
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
-        Text(symbol, color = Color.White, fontSize = 20.sp, fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.SemiBold)
+        Text(symbol, color = Color.White, fontSize = 15.sp, fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.SemiBold)
     }
 }
 

@@ -318,6 +318,79 @@ this codebase, but this phase should be built once before merging.
 
 ---
 
+## 2026-09 — GRANULAR redesign follow-up: UI fixes + correction-screen zoom/pan
+
+Real-device screenshots of the previous phase surfaced four visual bugs,
+fixed in two small commits, plus a genuine new feature requested on top
+of the redesign (not part of the original mockups, and a deliberate
+departure from SPEC.md's "you do not implement zoom" line -- the person
+who owns the app asked for it directly).
+
+**Bug fixes:**
+
+1. `Detect grains` (Review photo) and `Confirm` (Review & correct) were
+   56.dp tall (`PrimaryActionButton`'s default) next to their neighbor
+   at 52.dp (`SecondaryActionButton`'s default) -- the two screens where
+   they sit in the same row. Read as an oversized primary button with
+   disproportionately small corner ticks. Both now explicitly pass
+   `height = 52.dp` to match, per the mockup (both buttons are
+   height:52px on these two screens specifically).
+2. Review photo's image now uses `ContentScale.Crop` instead of the
+   default `Fit`, and the padding above "BEFORE CLASSIFYING" was
+   tightened, to remove a visible gap reported between the photo and
+   the checklist text. (The underlying bitmap is always exactly
+   1024×1024 by construction, so this is a defensive/robustness fix
+   rather than a confirmed root-cause fix -- see the "not independently
+   verified" note below.)
+3. Submit screen's thumbnail changed from `aspectRatio(1.9f)` to a true
+   `aspectRatio(1f)` (with `ContentScale.Crop`), so the always-square
+   source photo fills more of the space that was previously a blank
+   `Spacer` before the Submit button.
+
+**Zoom/pan feature (`correction/CorrectionScreen.kt`,
+`correction/CorrectionLogic.kt`):**
+
+Pinch-to-zoom (1x–4x) and pan (single-finger drag once zoomed) on the
+Review & correct image, so a technician can zoom into a dense cluster
+of grains before tapping. Implementation notes:
+
+- **One unified gesture detector, not two stacked ones.** The old code
+  used `detectTapGestures` alone. Naively adding a second, independent
+  `detectTransformGestures` alongside it is a known source of
+  double-firing/conflicts, since both would read the same raw pointer
+  event stream. Instead, a single `awaitEachGesture` loop decides tap
+  vs. transform itself: below a touch-slop threshold and with only one
+  pointer down, a release commits as a tap; past that threshold, or
+  with a second pointer down, it commits as zoom/pan. Without this
+  slop check, *any* tap with even a pixel of finger tremor during
+  touch-and-lift -- which is most real taps -- would misfire as a pan
+  and silently fail to add/remove a grain, which would have made the
+  screen's core interaction nearly unusable.
+- **Tap coordinates account for zoom/pan.** `screenTapToImageCoords`
+  (new, in `CorrectionLogic.kt`, unit-tested) inverts the
+  `graphicsLayer` scale+translation applied to the image content to
+  recover the correct 1024-space point under a tap at any zoom/pan
+  state. `clampPan` (also new, unit-tested) keeps panning from ever
+  revealing empty space around the image, and fully locks pan at 1x
+  zoom.
+- **The floating +/- buttons over the image were repurposed.** They
+  previously duplicated the Remove/Add segmented control below the
+  image (functionally a second mode toggle, visually indistinguishable
+  from zoom controls). Per the app owner's explicit choice, they're now
+  real zoom in/out steps (pinch is still the primary way to zoom), and
+  are smaller (32.dp, down from 44.dp) since a discrete zoom nicety is
+  lower-emphasis than the mode switch it used to be.
+
+**Not independently verified.** Same limitation as the phase above:
+there is no Android SDK in this environment, so none of this was built
+or run. The gesture-conflict reasoning above follows Compose's own
+`detectTransformGestures` implementation pattern (mirrored deliberately
+rather than invented), and the coordinate-transform math is unit
+tested, but real multi-touch gesture behavior -- particularly whether
+the touch-slop threshold feels right, and whether tap-to-add/remove
+still feels reliable once this ships -- needs on-device confirmation
+before this is considered done.
+
 ## Cross-cutting notes (apply to every phase)
 
 - **Single coordinate space.** Every `GrainBox` everywhere in this app

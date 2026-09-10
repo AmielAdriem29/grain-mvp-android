@@ -139,3 +139,47 @@ fun applyGrainTap(
         }
     }
 }
+
+/**
+ * Converts a tap position in the correction screen's outer, untransformed
+ * box coordinate space (screen px, 0..boxSizePx) into 1024-space image
+ * coordinates, accounting for the pinch-zoom/pan transform applied to the
+ * inner image + grain-box-overlay content (see CorrectionScreen's
+ * `graphicsLayer`). That transform scales the content around the box's
+ * center and then translates it by the pan offset, so this inverts
+ * exactly that: recover the position within the untransformed content
+ * box, then divide by displayScale (screen px -> 1024 image px), same
+ * conversion as before zoom/pan existed.
+ *
+ * Pure and framework-free (plain floats, no Offset/graphicsLayer types)
+ * like the rest of this file's tap logic, so it's unit-testable directly.
+ * At zoom == 1 and pan == 0 this reduces to the original
+ * `imageX = screenX / displayScale` formula.
+ */
+fun screenTapToImageCoords(
+    screenX: Float,
+    screenY: Float,
+    boxSizePx: Float,
+    displayScale: Float,
+    zoom: Float,
+    panX: Float,
+    panY: Float
+): Pair<Float, Float> {
+    val center = boxSizePx / 2f
+    val contentX = center + (screenX - center - panX) / zoom
+    val contentY = center + (screenY - center - panY) / zoom
+    return (contentX / displayScale) to (contentY / displayScale)
+}
+
+/**
+ * Clamps a pan offset (on one axis) so the zoomed content -- [zoom] x
+ * [boxSizePx] on a side -- never pans far enough to reveal empty space
+ * around the [boxSizePx] x [boxSizePx] viewport. Panning is only
+ * possible up to how far the zoomed content overhangs the viewport on
+ * that axis, and is fully locked at zoom == 1 (maxOffset is 0, so any
+ * pan value collapses back to 0).
+ */
+fun clampPan(pan: Float, boxSizePx: Float, zoom: Float): Float {
+    val maxOffset = (boxSizePx * (zoom - 1f) / 2f).coerceAtLeast(0f)
+    return pan.coerceIn(-maxOffset, maxOffset)
+}
