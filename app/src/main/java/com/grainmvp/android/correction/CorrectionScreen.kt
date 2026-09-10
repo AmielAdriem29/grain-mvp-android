@@ -34,6 +34,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -191,6 +192,15 @@ fun CorrectionScreen(
                 modifier = Modifier
                     .width(maxWidth)
                     .height(maxWidth)
+                    // Clips the scaled/panned content below to this Box's
+                    // own (un-scaled) bounds. This has to live here, on the
+                    // outer, fixed-size container -- graphicsLayer's own
+                    // `clip` parameter (see below) only clips a layer's
+                    // content to *that layer's own* local, pre-transform
+                    // bounds, which does nothing when the content already
+                    // exactly fills that local space; it does not clip the
+                    // transformed/scaled layer itself to its parent.
+                    .clipToBounds()
                     // A single gesture loop decides tap vs. pinch/pan itself
                     // (rather than stacking detectTapGestures and
                     // detectTransformGestures as two independent detectors,
@@ -253,13 +263,7 @@ fun CorrectionScreen(
                             scaleX = zoom,
                             scaleY = zoom,
                             translationX = panOffset.x,
-                            translationY = panOffset.y,
-                            // Without this, graphicsLayer's scale/translation
-                            // paint outside the layer's own layout bounds --
-                            // it defaults to false. This is what confines the
-                            // zoomed/panned image to the square viewport
-                            // instead of overflowing it.
-                            clip = true
+                            translationY = panOffset.y
                         )
                 ) {
                     Image(

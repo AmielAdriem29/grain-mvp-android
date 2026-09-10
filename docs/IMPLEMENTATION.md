@@ -391,6 +391,29 @@ the touch-slop threshold feels right, and whether tap-to-add/remove
 still feels reliable once this ships -- needs on-device confirmation
 before this is considered done.
 
+**Update, same week, after real on-device testing:** two things above
+were wrong, caught by the app owner building and running this on an
+actual device (not something this environment could catch):
+
+- `import androidx.compose.ui.draw.graphicsLayer` doesn't exist --
+  `graphicsLayer` lives in `androidx.compose.ui.graphics`, not
+  `androidx.compose.ui.draw` (unlike `alpha`, `clip`, and
+  `clipToBounds`, which genuinely are in `.draw`). This should have
+  failed to compile from the moment this phase landed.
+- The zoom/pan clip was on the wrong element. `graphicsLayer(clip =
+  true)` clips a layer's *content* to *that layer's own* local,
+  pre-transform bounds -- since the image already exactly fills that
+  local space, there was nothing for it to clip, and the zoomed image
+  visibly overflowed into the legend and mode-control rows below it.
+  The fix is `Modifier.clipToBounds()` on the *outer*, fixed-size
+  gesture Box instead, which clips the transformed/scaled inner content
+  to the outer container's bounds -- clipping has to wrap the
+  transform, not be applied by the transformed element to itself.
+
+Worth remembering for anywhere else this codebase reaches for
+`graphicsLayer` with a scale/translation and expects it to stay
+contained: the clip belongs on the parent, not the scaled node.
+
 ## Cross-cutting notes (apply to every phase)
 
 - **Single coordinate space.** Every `GrainBox` everywhere in this app
