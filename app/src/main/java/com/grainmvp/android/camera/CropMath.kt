@@ -92,3 +92,18 @@ fun computeCenterSquareCrop(width: Int, height: Int): CropRegion {
     val y = (height - size) / 2
     return CropRegion(x = x, y = y, size = size)
 }
+
+/**
+ * Largest power-of-two sample size that keeps a decoded image's shorter
+ * side at or above [reqSize] — the eventual crop/scale target, so a
+ * gallery pick never decodes (and holds in memory) more resolution than
+ * the final output needs. No Android framework dependency, so it's
+ * covered by a fast JUnit test rather than needing a real decode.
+ */
+fun calculateInSampleSize(width: Int, height: Int, reqSize: Int): Int {
+    var inSampleSize = 1
+    while (min(width, height) / (inSampleSize * 2) >= reqSize) {
+        inSampleSize *= 2
+    }
+    return inSampleSize
+}

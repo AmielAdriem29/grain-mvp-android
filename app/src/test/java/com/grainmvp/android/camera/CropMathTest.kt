@@ -143,4 +143,56 @@ class CropMathTest {
         assert(result.x + result.size <= 999)
         assert(result.y + result.size <= 1000)
     }
+
+    @Test
+    fun `already at target size needs no downsampling`() {
+        // min(1024,1024)=1024; 1024/(1*2)=512, which is below reqSize=1024,
+        // so the loop never runs and sampleSize stays 1.
+        val result = calculateInSampleSize(width = 1024, height = 1024, reqSize = 1024)
+
+        assertEquals(1, result)
+    }
+
+    @Test
+    fun `moderately oversized image downsamples by two`() {
+        // min(4000,3000)=3000; 3000/2=1500 >= 1024 -> sampleSize=2;
+        // 3000/4=750 < 1024 -> stop. Result: 2.
+        val result = calculateInSampleSize(width = 4000, height = 3000, reqSize = 1024)
+
+        assertEquals(2, result)
+    }
+
+    @Test
+    fun `much larger image downsamples by four`() {
+        // min(8000,6000)=6000; 6000/2=3000 >= 1024 -> sampleSize=2;
+        // 6000/4=1500 >= 1024 -> sampleSize=4; 6000/8=750 < 1024 -> stop.
+        // Result: 4.
+        val result = calculateInSampleSize(width = 8000, height = 6000, reqSize = 1024)
+
+        assertEquals(4, result)
+    }
+
+    @Test
+    fun `negative dimensions from a failed bounds read do not loop or crash`() {
+        // min(-1,-1)=-1; Kotlin Int division truncates toward zero, so
+        // -1/(1*2) = 0, which is below reqSize=1024 -> loop never runs.
+        // Result: 1 (a safe no-op sample size, not a crash or infinite loop).
+        val result = calculateInSampleSize(width = -1, height = -1, reqSize = 1024)
+
+        assertEquals(1, result)
+    }
+
+    @Test
+    fun `extreme aspect ratio only samples down by the shorter side`() {
+        // min(20000,1200)=1200; 1200/2=600 < 1024 -> loop never runs.
+        // Documents current behavior: a very wide/tall source stays at
+        // sampleSize=1 even though its long side is huge, because the
+        // heuristic only protects the eventual square crop's shorter
+        // side. The caller (processPickedImage) has its own try/catch
+        // around OutOfMemoryError as the safety net for this case,
+        // rather than this function attempting to cap total pixels.
+        val result = calculateInSampleSize(width = 20000, height = 1200, reqSize = 1024)
+
+        assertEquals(1, result)
+    }
 }

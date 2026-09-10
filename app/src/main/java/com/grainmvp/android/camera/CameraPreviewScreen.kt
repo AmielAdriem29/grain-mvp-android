@@ -1,10 +1,13 @@
 package com.grainmvp.android.camera
 
 import android.Manifest
+import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
+import android.media.ExifInterface
+import android.net.Uri
 import android.widget.FrameLayout
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
@@ -51,6 +54,13 @@ import androidx.core.content.ContextCompat
 import kotlin.math.min
 
 /**
+ * Fixed 1024x1024 — the single coordinate space every GrainBox in this
+ * whole system assumes. Do not change this without updating the
+ * backend/dashboard, which both assume it too.
+ */
+private const val OUTPUT_SIZE = 1024
+
+/**
  * Phase 1 (full): live camera preview + square guide + capture + crop +
  * downscale to 1024x1024, then a Review screen with Retake/Continue.
  *
@@ -74,10 +84,35 @@ fun CameraPreviewScreen(onImageConfirmed: (Bitmap) -> Unit) {
 
     var capturedImage by remember { mutableStateOf<Bitmap?>(null) }
 
+    // Gallery picking needs no runtime permission, so its launcher lives
+    // here rather than inside CaptureScreen -- that lets both the
+    // permission-request screen and the capture screen offer it, even
+    // when the technician hasn't granted camera access yet.
+    val galleryLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            val bitmap = processPickedImage(context, uri)
+            if (bitmap != null) {
+                capturedImage = bitmap
+            }
+        }
+    }
+    val onPickFromGallery = {
+        galleryLauncher.launch(
+            androidx.activity.result.PickVisualMediaRequest(
+                androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly
+            )
+        )
+    }
+
     if (!hasCameraPermission) {
-        PermissionRequestScreen(onRequestPermission = {
-            permissionLauncher.launch(Manifest.permission.CAMERA)
-        })
+        PermissionRequestScreen(
+            onRequestPermission = {
+                permissionLauncher.launch(Manifest.permission.CAMERA)
+            },
+            onPickFromGallery = onPickFromGallery
+        )
         return
     }
 
@@ -89,12 +124,15 @@ fun CameraPreviewScreen(onImageConfirmed: (Bitmap) -> Unit) {
             onContinue = { onImageConfirmed(currentImage) }
         )
     } else {
-        CaptureScreen(onCaptured = { bitmap -> capturedImage = bitmap })
+        CaptureScreen(
+            onCaptured = { bitmap -> capturedImage = bitmap },
+            onPickFromGallery = onPickFromGallery
+        )
     }
 }
 
 @Composable
-private fun PermissionRequestScreen(onRequestPermission: () -> Unit) {
+private fun PermissionRequestScreen(onRequestPermission: () -> Unit, onPickFromGallery: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -109,25 +147,22 @@ private fun PermissionRequestScreen(onRequestPermission: () -> Unit) {
         Button(onClick = onRequestPermission, modifier = Modifier.padding(top = 16.dp)) {
             Text("Grant camera permission")
         }
+        Text(
+            "Or scan a photo you've already saved:",
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.padding(top = 24.dp)
+        )
+        Button(onClick = onPickFromGallery, modifier = Modifier.padding(top = 8.dp)) {
+            Text("Choose from Gallery")
+        }
     }
 }
 
 @Composable
-private fun CaptureScreen(onCaptured: (Bitmap) -> Unit) {
+private fun CaptureScreen(onCaptured: (Bitmap) -> Unit, onPickFromGallery: () -> Unit) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     var imageCapture by remember { mutableStateOf<ImageCapture?>(null) }
-
-    val galleryLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
-        contract = androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia()
-    ) { uri: android.net.Uri? ->
-        if (uri != null) {
-            val bitmap = processPickedImage(context, uri)
-            if (bitmap != null) {
-                onCaptured(bitmap)
-            }
-        }
-    }
 
     Column(modifier = Modifier.fillMaxSize()) {
         Box(modifier = Modifier.weight(1f)) {
@@ -174,13 +209,7 @@ private fun CaptureScreen(onCaptured: (Bitmap) -> Unit) {
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                        Button(onClick = {
-                            galleryLauncher.launch(
-                                androidx.activity.result.PickVisualMediaRequest(
-                                    androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly
-                                )
-                            )
-                        }) {
+                        Button(onClick = onPickFromGallery) {
                             Text("Choose from Gallery")
                         }
 
@@ -260,10 +289,7 @@ private fun processCapturedImage(
         rotatedBitmap, crop.x, crop.y, crop.size, crop.size
     )
 
-    // Fixed 1024x1024 — the single coordinate space every GrainBox in
-    // this whole system assumes. Do not change this without updating
-    // the backend/dashboard, which both assume it too.
-    return Bitmap.createScaledBitmap(croppedBitmap, 1024, 1024, true)
+    return Bitmap.createScaledBitmap(croppedBitmap, OUTPUT_SIZE, OUTPUT_SIZE, true)
 }
 
 /**
@@ -271,62 +297,58 @@ private fun processCapturedImage(
  * bounds-only decode -> compute inSampleSize -> downsampled decode ->
  * rotate to match EXIF orientation -> center-crop to a square (no guide
  * overlay exists for a picked photo, unlike the camera path) -> downscale
- * to 1024x1024. Returns null if the URI can't be opened or decoded.
+ * to 1024x1024.
+ *
+ * Returns null if the URI can't be opened or decoded, if decoding throws
+ * (a missing/revoked URI grant, corrupt image or EXIF data, or an
+ * OutOfMemoryError on an extreme-aspect source the sample-size heuristic
+ * below can't shrink), or if the source is too small to fill the output
+ * size without upscaling past what the grading model should trust.
  */
-private fun processPickedImage(context: android.content.Context, uri: android.net.Uri): Bitmap? {
-    val boundsStream = context.contentResolver.openInputStream(uri) ?: return null
-    val boundsOptions = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-    boundsStream.use { BitmapFactory.decodeStream(it, null, boundsOptions) }
+private fun processPickedImage(context: Context, uri: Uri): Bitmap? {
+    return try {
+        val boundsStream = context.contentResolver.openInputStream(uri) ?: return null
+        val boundsOptions = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        boundsStream.use { BitmapFactory.decodeStream(it, null, boundsOptions) }
 
-    val decodeOptions = BitmapFactory.Options().apply {
-        inSampleSize = calculateInSampleSize(boundsOptions.outWidth, boundsOptions.outHeight, 1024)
-    }
-    val decodeStream = context.contentResolver.openInputStream(uri) ?: return null
-    val rawBitmap = decodeStream.use { BitmapFactory.decodeStream(it, null, decodeOptions) }
-        ?: return null
-
-    val exifStream = context.contentResolver.openInputStream(uri) ?: return null
-    val orientation = exifStream.use {
-        try {
-            android.media.ExifInterface(it).getAttributeInt(
-                android.media.ExifInterface.TAG_ORIENTATION,
-                android.media.ExifInterface.ORIENTATION_NORMAL
-            )
-        } catch (e: java.io.IOException) {
-            android.media.ExifInterface.ORIENTATION_NORMAL
+        val decodeOptions = BitmapFactory.Options().apply {
+            inSampleSize = calculateInSampleSize(boundsOptions.outWidth, boundsOptions.outHeight, OUTPUT_SIZE)
         }
-    }
-    val rotationDegrees = when (orientation) {
-        android.media.ExifInterface.ORIENTATION_ROTATE_90 -> 90
-        android.media.ExifInterface.ORIENTATION_ROTATE_180 -> 180
-        android.media.ExifInterface.ORIENTATION_ROTATE_270 -> 270
-        // ponytail: rotation only, not flip/mirror — add if real photos need it
-        else -> 0
-    }
-    val rotatedBitmap = if (rotationDegrees != 0) {
-        val matrix = Matrix().apply { postRotate(rotationDegrees.toFloat()) }
-        Bitmap.createBitmap(rawBitmap, 0, 0, rawBitmap.width, rawBitmap.height, matrix, true)
-    } else {
-        rawBitmap
-    }
+        val decodeStream = context.contentResolver.openInputStream(uri) ?: return null
+        val rawBitmap = decodeStream.use { BitmapFactory.decodeStream(it, null, decodeOptions) }
+            ?: return null
 
-    val crop = computeCenterSquareCrop(width = rotatedBitmap.width, height = rotatedBitmap.height)
-    val croppedBitmap = Bitmap.createBitmap(rotatedBitmap, crop.x, crop.y, crop.size, crop.size)
+        val exifStream = context.contentResolver.openInputStream(uri) ?: return null
+        val orientation = exifStream.use {
+            ExifInterface(it).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
+        }
+        val rotationDegrees = when (orientation) {
+            ExifInterface.ORIENTATION_ROTATE_90 -> 90
+            ExifInterface.ORIENTATION_ROTATE_180 -> 180
+            ExifInterface.ORIENTATION_ROTATE_270 -> 270
+            // ponytail: rotation only, not flip/mirror — add if real photos need it
+            else -> 0
+        }
+        val rotatedBitmap = if (rotationDegrees != 0) {
+            val matrix = Matrix().apply { postRotate(rotationDegrees.toFloat()) }
+            Bitmap.createBitmap(rawBitmap, 0, 0, rawBitmap.width, rawBitmap.height, matrix, true)
+        } else {
+            rawBitmap
+        }
 
-    return Bitmap.createScaledBitmap(croppedBitmap, 1024, 1024, true)
-}
+        val crop = computeCenterSquareCrop(width = rotatedBitmap.width, height = rotatedBitmap.height)
+        // A source smaller than the output would get silently upscaled into a
+        // well-formed-looking 1024x1024 image carrying far less real detail --
+        // reject it instead of feeding the grading model false confidence.
+        if (crop.size < OUTPUT_SIZE) return null
 
-/**
- * Largest power-of-two sample size that keeps the decoded image's
- * shorter side at or above [reqSize] — the eventual crop/scale target,
- * so we never sample below what the final output needs.
- */
-private fun calculateInSampleSize(width: Int, height: Int, reqSize: Int): Int {
-    var inSampleSize = 1
-    while (min(width, height) / (inSampleSize * 2) >= reqSize) {
-        inSampleSize *= 2
+        val croppedBitmap = Bitmap.createBitmap(rotatedBitmap, crop.x, crop.y, crop.size, crop.size)
+        Bitmap.createScaledBitmap(croppedBitmap, OUTPUT_SIZE, OUTPUT_SIZE, true)
+    } catch (e: Exception) {
+        null
+    } catch (e: OutOfMemoryError) {
+        null
     }
-    return inSampleSize
 }
 
 @Composable
