@@ -87,11 +87,12 @@ private const val ZOOM_STEP = 1.5f
  *    image), so a tap is never ambiguous about what it will do -- see
  *    [GrainCorrectionMode] / [applyGrainTap] in CorrectionLogic.kt
  *  - box states distinguished by line style as well as color: solid
- *    blue = detected/untouched, white dashed = removed, solid dark
- *    green = added -- all boxes the same size; the "added" box
- *    originally had an extra white halo to look visually bigger, but
- *    the app owner asked to drop it since color already distinguishes
- *    them clearly enough
+ *    blue = detected/untouched, white dashed = removed, dark green
+ *    (with a small white halo, for visibility against a dark photo) =
+ *    added. The halo used to be twice as large, making added boxes
+ *    look noticeably bigger than the others for no added clarity;
+ *    shrunk to keep the footprint close to the same while still
+ *    standing out against a dark background
  *  - pinch-to-zoom and pan (single-finger drag once zoomed) on the
  *    image, so a technician can zoom into a dense cluster of grains
  *    before tapping -- see the `awaitEachGesture` block below and
@@ -288,15 +289,29 @@ fun CorrectionScreen(
                                         pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 4f), 0f)
                                     )
                                 )
-                                // Same size as every other box (no halo) --
-                                // color is the only distinction now, per
-                                // the app owner's call.
-                                "added" -> drawRect(
-                                    color = Accent900,
-                                    topLeft = topLeft,
-                                    size = boxSize,
-                                    style = Stroke(width = 1.5.dp.toPx())
-                                )
+                                "added" -> {
+                                    // Accent900 is a very dark green -- easy
+                                    // to lose against a dark patch of the
+                                    // photo without some halo. Removing it
+                                    // entirely (previous pass) made added
+                                    // boxes hard to see; this brings a much
+                                    // smaller one back (1dp vs. the original
+                                    // 2dp) so the box is still close to the
+                                    // same footprint as detected/removed.
+                                    val halo = 1.dp.toPx()
+                                    drawRect(
+                                        color = Color.White.copy(alpha = 0.7f),
+                                        topLeft = Offset(topLeft.x - halo, topLeft.y - halo),
+                                        size = Size(boxSize.width + halo * 2, boxSize.height + halo * 2),
+                                        style = Stroke(width = 1.dp.toPx())
+                                    )
+                                    drawRect(
+                                        color = Accent900,
+                                        topLeft = topLeft,
+                                        size = boxSize,
+                                        style = Stroke(width = 1.5.dp.toPx())
+                                    )
+                                }
                                 else -> drawRect(
                                     color = DetectionBlue,
                                     topLeft = topLeft,
