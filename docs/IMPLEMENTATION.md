@@ -211,6 +211,249 @@ since real work happened and future contributors should know about it.
 - SampleType as free text vs. dropdown — no list of valid rice varieties provided yet
 - Phase 2/4's real backend verification — still blocked on Sitoy
 
+## 2026-09 — GRANULAR field redesign (UX pass, not a spec change)
+
+A Claude Design session produced HTML mockups of 8 redesigned screens
+(`project/GRANULAR Field Redesign.dc.html` in the design repo) and this
+phase recreated them as native Compose code. Same two endpoints, same
+1024×1024 coordinate space, same `GrainBox` field names as SPEC.md --
+this is a visual/UX pass, not a backend or contract change. Substantive
+behavior changes:
+
+1. **Technician name + sample ID moved earlier.** Collected on the new
+   `home/StartSessionScreen.kt` (screen 02), right after the opening
+   splash, instead of on Submit. By the time the technician reaches
+   `submit/SubmitScreen.kt`, those two fields are a read-only summary,
+   not a form. `MainActivity.kt`'s `Screen` sealed class now threads
+   `technicianName`/`sampleId` through `Capture` → `Correction` →
+   `Submit`.
+2. **Correction screen (`correction/CorrectionScreen.kt`, screen 05)**
+   gets a live running count (AI detected / you removed / you added,
+   computed reactively), an explicit Remove/Add mode
+   (`GrainCorrectionMode` in `correction/CorrectionLogic.kt`) so a tap
+   is never ambiguous, and box states distinguished by line style, not
+   just color, for colorblind accessibility: solid blue = detected,
+   white dashed = removed, thick dark with a white halo = added. New
+   pure logic (`applyGrainTap`) is unit tested in
+   `CorrectionLogicTest.kt` alongside the existing tap-logic tests.
+3. **Failure screen (`submit/FailureScreen.kt`, screen 07)** replaces
+   the raw `"${exceptionClassName}: ${message}"` string with a
+   plain-language sentence, keeping the raw exception class name +
+   endpoint in small print underneath for support purposes.
+4. **App renamed GRANULAR** -- `res/values/strings.xml`'s `app_name`,
+   plus the wordmark on every redesigned screen. Logo asset copied to
+   `res/drawable/granular_logo.png`.
+5. **Camera screen (`camera/CameraPreviewScreen.kt`, screen 03)** keeps
+   all CameraX/crop-math logic (`camera/CropMath.kt`, untouched) and
+   only changes the decorative overlay: green accent corner brackets
+   instead of a plain guide rectangle, a session-context pill + a real
+   torch toggle (wired to `Camera.cameraControl.enableTorch`, guarded
+   by `cameraInfo.hasFlashUnit()`), a decorative grid toggle, and the
+   gallery button (previously present but buried) surfaced into the
+   bottom control row alongside the shutter.
+
+New reusable components: `ui/components/BlueprintFrame.kt` (the
+bordered, corner-ticked "blueprint" card used on Start Session, Submit,
+Failure, and Result) and `ui/components/AppButtons.kt`
+(`PrimaryActionButton`/`SecondaryActionButton`, square-cornered,
+matching the design system). New design tokens added to
+`ui/theme/Color.kt` (accent scale, neutral scale, divider, detection
+colors, failure/result card colors) rather than hardcoding hex per
+screen. `ui/theme/Theme.kt` now overrides every Material3 shape slot to
+a 0dp-radius `RoundedCornerShape` (Material3's `Shapes` class requires
+`CornerBasedShape`, which the plain `RectangleShape` object does not
+implement) so stock Material components default to square corners too.
+
+**Deviations from the design mockups (documented, not silent):**
+
+1. **Typography.** The design specifies "Barlow Condensed" (headings)
+   and "Barlow" (body) via Google Fonts. There is no offline font file
+   bundled in this app and no `ui-text-google-fonts` (downloadable
+   fonts) dependency in `app/build.gradle.kts`. Rather than add a new
+   font dependency I could not verify compiles in this environment (no
+   Android SDK available -- see below), every redesigned screen
+   approximates the look with `FontFamily.SansSerif` plus bold/semibold
+   weights and generous `letterSpacing`, especially on the uppercase
+   "eyebrow" labels, which carries most of the "condensed industrial"
+   feel even without the exact typeface.
+2. **"Backend reachable" / "N queued" on Start Session
+   (`home/StartSessionScreen.kt`) are static display text**, not wired
+   to a real connectivity check or an offline submission queue. Neither
+   exists anywhere in this app, and SPEC.md explicitly says
+   duplicate-submission/queueing logic is not required for the MVP.
+   Building either would be new functionality out of scope for a UI
+   redesign.
+3. **"Keep on device" on the Failure screen
+   (`submit/FailureScreen.kt`) does not actually persist the sample for
+   a later automatic retry.** This app has no local persistence layer.
+   The button currently just ends the current attempt and returns to
+   Welcome -- functionally identical to today's lack of a retry queue,
+   despite the copy ("...or keep scanning and send it later") implying
+   more. This is a real UX gap, not just a technical footnote -- it's
+   worth a follow-up conversation with whoever specced that copy before
+   shipping it, since a technician reading "send it later" would
+   reasonably expect the app to actually do that.
+4. **Result screen's total grain count is derived, not
+   backend-supplied.** `POST /api/replicate`'s response
+   (`ReplicateResponse` in `network/ApiModels.kt`) has no total-grain
+   field. `submit/ResultScreen.kt` computes
+   `totalGrains = round(confirmedGrainCount / (percentage / 100.0))` --
+   exact algebra from `percentage`'s own definition
+   (`immature/total × 100`), not a guess, but flagged here since it's
+   derived client-side rather than sent by the server.
+
+**Not a deviation, but worth noting:** `ui/components/AppHeader.kt`
+(the old branded header bar) has no remaining callers -- none of the
+redesigned screens use it, since each screen in the mockups has its own
+bespoke header. Left in place rather than deleted, per the same
+"unverified compile, don't take a destructive action I can't check"
+reasoning as the font dependency above; a future cleanup pass can
+remove it once someone can actually build the app.
+
+**Compilation was not verified.** There is no Android SDK in this
+environment, so `./gradlew build` could not be run. Every file touched
+in this phase was re-read after writing for import correctness and
+Compose API usage against the exact APIs already in use elsewhere in
+this codebase, but this phase should be built once before merging.
+
+---
+
+## 2026-09 — GRANULAR redesign follow-up: UI fixes + correction-screen zoom/pan
+
+Real-device screenshots of the previous phase surfaced four visual bugs,
+fixed in two small commits, plus a genuine new feature requested on top
+of the redesign (not part of the original mockups, and a deliberate
+departure from SPEC.md's "you do not implement zoom" line -- the person
+who owns the app asked for it directly).
+
+**Bug fixes:**
+
+1. `Detect grains` (Review photo) and `Confirm` (Review & correct) were
+   56.dp tall (`PrimaryActionButton`'s default) next to their neighbor
+   at 52.dp (`SecondaryActionButton`'s default) -- the two screens where
+   they sit in the same row. Read as an oversized primary button with
+   disproportionately small corner ticks. Both now explicitly pass
+   `height = 52.dp` to match, per the mockup (both buttons are
+   height:52px on these two screens specifically).
+2. Review photo's image now uses `ContentScale.Crop` instead of the
+   default `Fit`, and the padding above "BEFORE CLASSIFYING" was
+   tightened, to remove a visible gap reported between the photo and
+   the checklist text. (The underlying bitmap is always exactly
+   1024×1024 by construction, so this is a defensive/robustness fix
+   rather than a confirmed root-cause fix -- see the "not independently
+   verified" note below.)
+3. Submit screen's thumbnail changed from `aspectRatio(1.9f)` to a true
+   `aspectRatio(1f)` (with `ContentScale.Crop`), so the always-square
+   source photo fills more of the space that was previously a blank
+   `Spacer` before the Submit button.
+
+**Zoom/pan feature (`correction/CorrectionScreen.kt`,
+`correction/CorrectionLogic.kt`):**
+
+Pinch-to-zoom (1x–4x) and pan (single-finger drag once zoomed) on the
+Review & correct image, so a technician can zoom into a dense cluster
+of grains before tapping. Implementation notes:
+
+- **One unified gesture detector, not two stacked ones.** The old code
+  used `detectTapGestures` alone. Naively adding a second, independent
+  `detectTransformGestures` alongside it is a known source of
+  double-firing/conflicts, since both would read the same raw pointer
+  event stream. Instead, a single `awaitEachGesture` loop decides tap
+  vs. transform itself: below a touch-slop threshold and with only one
+  pointer down, a release commits as a tap; past that threshold, or
+  with a second pointer down, it commits as zoom/pan. Without this
+  slop check, *any* tap with even a pixel of finger tremor during
+  touch-and-lift -- which is most real taps -- would misfire as a pan
+  and silently fail to add/remove a grain, which would have made the
+  screen's core interaction nearly unusable.
+- **Tap coordinates account for zoom/pan.** `screenTapToImageCoords`
+  (new, in `CorrectionLogic.kt`, unit-tested) inverts the
+  `graphicsLayer` scale+translation applied to the image content to
+  recover the correct 1024-space point under a tap at any zoom/pan
+  state. `clampPan` (also new, unit-tested) keeps panning from ever
+  revealing empty space around the image, and fully locks pan at 1x
+  zoom.
+- **The floating +/- buttons over the image were repurposed.** They
+  previously duplicated the Remove/Add segmented control below the
+  image (functionally a second mode toggle, visually indistinguishable
+  from zoom controls). Per the app owner's explicit choice, they're now
+  real zoom in/out steps (pinch is still the primary way to zoom), and
+  are smaller (32.dp, down from 44.dp) since a discrete zoom nicety is
+  lower-emphasis than the mode switch it used to be.
+
+**Not independently verified.** Same limitation as the phase above:
+there is no Android SDK in this environment, so none of this was built
+or run. The gesture-conflict reasoning above follows Compose's own
+`detectTransformGestures` implementation pattern (mirrored deliberately
+rather than invented), and the coordinate-transform math is unit
+tested, but real multi-touch gesture behavior -- particularly whether
+the touch-slop threshold feels right, and whether tap-to-add/remove
+still feels reliable once this ships -- needs on-device confirmation
+before this is considered done.
+
+**Update, same week, after real on-device testing:** two things above
+were wrong, caught by the app owner building and running this on an
+actual device (not something this environment could catch):
+
+- `import androidx.compose.ui.draw.graphicsLayer` doesn't exist --
+  `graphicsLayer` lives in `androidx.compose.ui.graphics`, not
+  `androidx.compose.ui.draw` (unlike `alpha`, `clip`, and
+  `clipToBounds`, which genuinely are in `.draw`). This should have
+  failed to compile from the moment this phase landed.
+- The zoom/pan clip was on the wrong element. `graphicsLayer(clip =
+  true)` clips a layer's *content* to *that layer's own* local,
+  pre-transform bounds -- since the image already exactly fills that
+  local space, there was nothing for it to clip, and the zoomed image
+  visibly overflowed into the legend and mode-control rows below it.
+  The fix is `Modifier.clipToBounds()` on the *outer*, fixed-size
+  gesture Box instead, which clips the transformed/scaled inner content
+  to the outer container's bounds -- clipping has to wrap the
+  transform, not be applied by the transformed element to itself.
+
+Worth remembering for anywhere else this codebase reaches for
+`graphicsLayer` with a scale/translation and expects it to stay
+contained: the clip belongs on the parent, not the scaled node.
+
+## 2026-09 — "Keep on device" actually implemented
+
+Earlier in this same redesign, "Keep on device" (Failure screen) was
+flagged as copy describing functionality that didn't exist -- this app
+had zero persistence infrastructure anywhere (confirmed by search: no
+Room, no DataStore, no file storage), and `docs/SPEC.md` explicitly
+never required a retry queue (*"Do not build any special
+duplicate-prevention logic... this is expected and accepted"*). The app
+owner asked for it to be built for real. Scope, decided explicitly
+rather than assumed:
+
+- **In-memory only**, not disk-backed -- lost if the app is killed. A
+  durable version that survives an app restart is intentionally
+  deferred; the app owner will file a follow-up issue for it after this
+  PR.
+- **Multiple items queued**, not just the most recent failure -- a
+  technician might hit a dead zone and keep scanning several samples
+  before connectivity returns.
+- **Manual retry**, not automatic background sync -- a "Send N queued"
+  button, not a scheduled job.
+
+Implementation: `submit/ReplicateQueue.kt` holds the `QueuedReplicate`
+data class (everything a resubmission needs: image, technician, sample
+ID, both grain lists, weight) and `submitQueuedReplicate()`, the same
+`POST /api/replicate` call `SubmitScreen`'s own submit flow now also
+calls through, so the multipart/JSON-encoding logic exists in exactly
+one place. `MainActivity` owns the actual queue
+(`mutableStateListOf<QueuedReplicate>`) since it needs to survive
+navigating between screens; tapping "Keep on device" adds to it and
+continues to the *next* sample (same technician, incremented ID, per
+the Failure screen's own copy: "...or keep scanning and send it
+later") rather than ending the session. `sendQueuedReplicates()`
+(MainActivity.kt) attempts each queued item in order on the "Send N
+queued" button (now shown for real on Start Session, replacing the
+previously-static "N queued" text), removing whatever succeeds and
+leaving the rest queued for next time.
+
+Not independently verified end-to-end against a real backend -- no
+Android SDK in this environment, same limitation as every phase above.
+
 ## Cross-cutting notes (apply to every phase)
 
 - **Single coordinate space.** Every `GrainBox` everywhere in this app
