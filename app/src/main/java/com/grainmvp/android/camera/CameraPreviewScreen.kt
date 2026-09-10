@@ -118,6 +118,17 @@ private fun CaptureScreen(onCaptured: (Bitmap) -> Unit) {
     val lifecycleOwner = LocalLifecycleOwner.current
     var imageCapture by remember { mutableStateOf<ImageCapture?>(null) }
 
+    val galleryLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia()
+    ) { uri: android.net.Uri? ->
+        if (uri != null) {
+            val bitmap = processPickedImage(context, uri)
+            if (bitmap != null) {
+                onCaptured(bitmap)
+            }
+        }
+    }
+
     Column(modifier = Modifier.fillMaxSize()) {
         Box(modifier = Modifier.weight(1f)) {
             BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
@@ -154,7 +165,7 @@ private fun CaptureScreen(onCaptured: (Bitmap) -> Unit) {
                     )
                 }
 
-                // Bottom-anchored capture button, matching the wireframe.
+                // Bottom-anchored capture + gallery buttons, matching the wireframe.
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
@@ -162,34 +173,46 @@ private fun CaptureScreen(onCaptured: (Bitmap) -> Unit) {
                     verticalArrangement = Arrangement.Bottom,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Button(onClick = {
-                        val capture = imageCapture ?: return@Button
-                        capture.takePicture(
-                            ContextCompat.getMainExecutor(context),
-                            object : ImageCapture.OnImageCapturedCallback() {
-                                override fun onCaptureSuccess(image: ImageProxy) {
-                                    val finalBitmap = processCapturedImage(
-                                        image = image,
-                                        previewWidthPx = previewWidthPx,
-                                        previewHeightPx = previewHeightPx,
-                                        guideLeft = guideLeft,
-                                        guideTop = guideTop,
-                                        guideSize = guideSize
-                                    )
-                                    image.close()
-                                    onCaptured(finalBitmap)
-                                }
+                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        Button(onClick = {
+                            galleryLauncher.launch(
+                                androidx.activity.result.PickVisualMediaRequest(
+                                    androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly
+                                )
+                            )
+                        }) {
+                            Text("Choose from Gallery")
+                        }
 
-                                override fun onError(exception: ImageCaptureException) {
-                                    // Phase 5 polish adds a user-visible error
-                                    // message here. For now, the technician
-                                    // just sees the shutter didn't advance
-                                    // to Review and can tap again.
+                        Button(onClick = {
+                            val capture = imageCapture ?: return@Button
+                            capture.takePicture(
+                                ContextCompat.getMainExecutor(context),
+                                object : ImageCapture.OnImageCapturedCallback() {
+                                    override fun onCaptureSuccess(image: ImageProxy) {
+                                        val finalBitmap = processCapturedImage(
+                                            image = image,
+                                            previewWidthPx = previewWidthPx,
+                                            previewHeightPx = previewHeightPx,
+                                            guideLeft = guideLeft,
+                                            guideTop = guideTop,
+                                            guideSize = guideSize
+                                        )
+                                        image.close()
+                                        onCaptured(finalBitmap)
+                                    }
+
+                                    override fun onError(exception: ImageCaptureException) {
+                                        // Phase 5 polish adds a user-visible error
+                                        // message here. For now, the technician
+                                        // just sees the shutter didn't advance
+                                        // to Review and can tap again.
+                                    }
                                 }
-                            }
-                        )
-                    }) {
-                        Text("Capture Photo")
+                            )
+                        }) {
+                            Text("Capture Photo")
+                        }
                     }
                 }
             }
@@ -240,6 +263,23 @@ private fun processCapturedImage(
     // Fixed 1024x1024 — the single coordinate space every GrainBox in
     // this whole system assumes. Do not change this without updating
     // the backend/dashboard, which both assume it too.
+    return Bitmap.createScaledBitmap(croppedBitmap, 1024, 1024, true)
+}
+
+/**
+ * Converts a gallery-picked image into the final 1024x1024 image:
+ * decode -> center-crop to a square (no guide overlay exists for a
+ * picked photo, unlike the camera path) -> downscale to 1024x1024.
+ * Returns null if the URI can't be opened or decoded.
+ */
+private fun processPickedImage(context: android.content.Context, uri: android.net.Uri): Bitmap? {
+    val rawBitmap = context.contentResolver.openInputStream(uri)?.use { stream ->
+        BitmapFactory.decodeStream(stream)
+    } ?: return null
+
+    val crop = computeCenterSquareCrop(width = rawBitmap.width, height = rawBitmap.height)
+    val croppedBitmap = Bitmap.createBitmap(rawBitmap, crop.x, crop.y, crop.size, crop.size)
+
     return Bitmap.createScaledBitmap(croppedBitmap, 1024, 1024, true)
 }
 
