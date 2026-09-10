@@ -86,9 +86,12 @@ private const val ZOOM_STEP = 1.5f
  *  - an explicit Remove/Add mode (the segmented control below the
  *    image), so a tap is never ambiguous about what it will do -- see
  *    [GrainCorrectionMode] / [applyGrainTap] in CorrectionLogic.kt
- *  - box states distinguished by line style, not just color, for
- *    colorblind accessibility: solid blue = detected/untouched, white
- *    dashed = removed, thick dark with a white halo = added
+ *  - box states distinguished by line style as well as color: solid
+ *    blue = detected/untouched, white dashed = removed, solid dark
+ *    green = added -- all boxes the same size; the "added" box
+ *    originally had an extra white halo to look visually bigger, but
+ *    the app owner asked to drop it since color already distinguishes
+ *    them clearly enough
  *  - pinch-to-zoom and pan (single-finger drag once zoomed) on the
  *    image, so a technician can zoom into a dense cluster of grains
  *    before tapping -- see the `awaitEachGesture` block below and
@@ -285,21 +288,15 @@ fun CorrectionScreen(
                                         pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 4f), 0f)
                                     )
                                 )
-                                "added" -> {
-                                    val halo = 2.dp.toPx()
-                                    drawRect(
-                                        color = Color.White.copy(alpha = 0.8f),
-                                        topLeft = Offset(topLeft.x - halo, topLeft.y - halo),
-                                        size = Size(boxSize.width + halo * 2, boxSize.height + halo * 2),
-                                        style = Stroke(width = 1.dp.toPx())
-                                    )
-                                    drawRect(
-                                        color = Accent900,
-                                        topLeft = topLeft,
-                                        size = boxSize,
-                                        style = Stroke(width = 2.dp.toPx())
-                                    )
-                                }
+                                // Same size as every other box (no halo) --
+                                // color is the only distinction now, per
+                                // the app owner's call.
+                                "added" -> drawRect(
+                                    color = Accent900,
+                                    topLeft = topLeft,
+                                    size = boxSize,
+                                    style = Stroke(width = 1.5.dp.toPx())
+                                )
                                 else -> drawRect(
                                     color = DetectionBlue,
                                     topLeft = topLeft,
@@ -357,7 +354,7 @@ fun CorrectionScreen(
                     Box(
                         Modifier
                             .size(12.dp)
-                            .border(2.dp, Accent900)
+                            .border(1.5.dp, Accent900)
                     )
                 }
             )

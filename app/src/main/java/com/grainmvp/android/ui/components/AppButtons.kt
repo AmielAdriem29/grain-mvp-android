@@ -18,15 +18,17 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.grainmvp.android.ui.theme.AccentGreen
-import com.grainmvp.android.ui.theme.Accent900
 import com.grainmvp.android.ui.theme.DividerColor
 import com.grainmvp.android.ui.theme.TextPrimaryGranular
 
 /**
  * Primary action button for the GRANULAR field redesign: square corners,
- * filled accent-green, with the corner-tick "blueprint" styling every
- * primary button in the mockups carries. One reusable composable instead
- * of repeating this Button/Modifier chain on every screen.
+ * filled accent-green. Plain -- no corner-tick "blueprint" styling; the
+ * mockups had it, but it read as a stray artifact on a solid-fill
+ * button (see docs/IMPLEMENTATION.md's dated section on the bleed/inset
+ * issue this had), and the app owner asked to drop it here rather than
+ * keep tuning it. Still used on cards/frames elsewhere (BlueprintFrame,
+ * the two image frames), where it has visual room to sit cleanly.
  *
  * [loading] shows a small spinner ahead of [text] and disables the
  * button, *inside* its fixed [height] -- a separate loading indicator
@@ -55,9 +57,7 @@ fun PrimaryActionButton(
             disabledContainerColor = AccentGreen.copy(alpha = 0.4f),
             disabledContentColor = Color.White.copy(alpha = 0.7f)
         ),
-        modifier = modifier
-            .height(height)
-            .blueprintCorners(Accent900)
+        modifier = modifier.height(height)
     ) {
         if (loading) {
             CircularProgressIndicator(

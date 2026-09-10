@@ -80,13 +80,13 @@ import kotlin.math.min
 private const val OUTPUT_SIZE = 1024
 
 /**
- * The camera-screen "on-dark" accent used only for the capture chrome's
- * guide brackets and small icon glyphs (screen 03 of the redesign) --
- * lighter than the app's normal accent green so it reads against the
- * dark live preview. Not one of the named design-system tokens in
- * ui/theme/Color.kt because it's local to this one dark screen.
+ * The capture chrome's guide brackets and small icon glyphs (screen 03
+ * of the redesign) use the app's regular accent green, same as
+ * everywhere else -- a lighter green was tried here for contrast
+ * against the dark live preview, but the app owner wants the one
+ * consistent shade throughout instead.
  */
-private val CaptureAccentGreen = Color(0xFF8CC994)
+private val CaptureAccentGreen = AccentGreen
 
 /**
  * Screens 03 (Capture) and 04 (Review photo) of the GRANULAR field
