@@ -103,4 +103,44 @@ class CropMathTest {
         assert(result.x + result.size <= 4000)
         assert(result.y + result.size <= 3000)
     }
+
+    @Test
+    fun `portrait image crops top and bottom to a centered square`() {
+        // width=1000, height=2000 -> size=1000, x=0, y=(2000-1000)/2=500
+        val result = computeCenterSquareCrop(width = 1000, height = 2000)
+
+        assertEquals(0, result.x)
+        assertEquals(500, result.y)
+        assertEquals(1000, result.size)
+    }
+
+    @Test
+    fun `landscape image crops left and right to a centered square`() {
+        // width=2000, height=1000 -> size=1000, x=(2000-1000)/2=500, y=0
+        val result = computeCenterSquareCrop(width = 2000, height = 1000)
+
+        assertEquals(500, result.x)
+        assertEquals(0, result.y)
+        assertEquals(1000, result.size)
+    }
+
+    @Test
+    fun `already-square image needs no offset`() {
+        val result = computeCenterSquareCrop(width = 800, height = 800)
+
+        assertEquals(0, result.x)
+        assertEquals(0, result.y)
+        assertEquals(800, result.size)
+    }
+
+    @Test
+    fun `odd difference between width and height still stays in bounds`() {
+        // width=999, height=1000 -> size=999, x=0, y=(1000-999)/2=0 (integer division)
+        val result = computeCenterSquareCrop(width = 999, height = 1000)
+
+        assert(result.x >= 0)
+        assert(result.y >= 0)
+        assert(result.x + result.size <= 999)
+        assert(result.y + result.size <= 1000)
+    }
 }
