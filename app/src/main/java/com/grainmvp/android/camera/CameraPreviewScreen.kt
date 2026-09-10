@@ -287,10 +287,14 @@ private fun processPickedImage(context: android.content.Context, uri: android.ne
 
     val exifStream = context.contentResolver.openInputStream(uri) ?: return null
     val orientation = exifStream.use {
-        android.media.ExifInterface(it).getAttributeInt(
-            android.media.ExifInterface.TAG_ORIENTATION,
+        try {
+            android.media.ExifInterface(it).getAttributeInt(
+                android.media.ExifInterface.TAG_ORIENTATION,
+                android.media.ExifInterface.ORIENTATION_NORMAL
+            )
+        } catch (e: java.io.IOException) {
             android.media.ExifInterface.ORIENTATION_NORMAL
-        )
+        }
     }
     val rotationDegrees = when (orientation) {
         android.media.ExifInterface.ORIENTATION_ROTATE_90 -> 90
