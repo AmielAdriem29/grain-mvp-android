@@ -1,5 +1,7 @@
 package com.grainmvp.android.camera
 
+import kotlin.math.min
+
 /**
  * A square region to crop out of the raw sensor image, in sensor pixel
  * space. x/y are the top-left corner, size is both width and height
@@ -76,4 +78,32 @@ fun computeCropRegion(
         y = clampedY.toInt(),
         size = clampedSize.toInt()
     )
+}
+
+/**
+ * Center-crops an arbitrary width/height image down to the largest
+ * centered square that fits inside it. Used for gallery-picked images,
+ * which — unlike a camera capture — have no guide overlay to match, so
+ * a plain centered square is the closest equivalent.
+ */
+fun computeCenterSquareCrop(width: Int, height: Int): CropRegion {
+    val size = min(width, height)
+    val x = (width - size) / 2
+    val y = (height - size) / 2
+    return CropRegion(x = x, y = y, size = size)
+}
+
+/**
+ * Largest power-of-two sample size that keeps a decoded image's shorter
+ * side at or above [reqSize] — the eventual crop/scale target, so a
+ * gallery pick never decodes (and holds in memory) more resolution than
+ * the final output needs. No Android framework dependency, so it's
+ * covered by a fast JUnit test rather than needing a real decode.
+ */
+fun calculateInSampleSize(width: Int, height: Int, reqSize: Int): Int {
+    var inSampleSize = 1
+    while (min(width, height) / (inSampleSize * 2) >= reqSize) {
+        inSampleSize *= 2
+    }
+    return inSampleSize
 }

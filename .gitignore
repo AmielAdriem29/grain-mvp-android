@@ -13,3 +13,5 @@
 .artifacts/
 # Secrets — BackendConfig values are provided locally, never committed.
 # See README for how to set BASE_URL / API_KEY per developer machine.
+docs/dashboard_v7.html
+docs/dashboard_v7_spec.md
