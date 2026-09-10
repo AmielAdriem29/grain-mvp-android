@@ -282,19 +282,25 @@ private fun CaptureScreen(sampleId: String, onCaptured: (Bitmap) -> Unit, onPick
                     }
 
                     if (gridOn) {
+                        // Rule-of-thirds 3x3, not a 2x2 half-split: two
+                        // evenly-spaced lines each direction, at 1/3 and 2/3.
                         val gridColor = Color.White.copy(alpha = 0.4f)
-                        drawLine(
-                            gridColor,
-                            Offset(guideLeft + guideSize / 2f, guideTop),
-                            Offset(guideLeft + guideSize / 2f, guideTop + guideSize),
-                            1.dp.toPx()
-                        )
-                        drawLine(
-                            gridColor,
-                            Offset(guideLeft, guideTop + guideSize / 2f),
-                            Offset(guideLeft + guideSize, guideTop + guideSize / 2f),
-                            1.dp.toPx()
-                        )
+                        val gridStroke = 1.dp.toPx()
+                        for (i in 1..2) {
+                            val fraction = i / 3f
+                            drawLine(
+                                gridColor,
+                                Offset(guideLeft + guideSize * fraction, guideTop),
+                                Offset(guideLeft + guideSize * fraction, guideTop + guideSize),
+                                gridStroke
+                            )
+                            drawLine(
+                                gridColor,
+                                Offset(guideLeft, guideTop + guideSize * fraction),
+                                Offset(guideLeft + guideSize, guideTop + guideSize * fraction),
+                                gridStroke
+                            )
+                        }
                     }
                 }
 
@@ -375,8 +381,21 @@ private fun CaptureScreen(sampleId: String, onCaptured: (Bitmap) -> Unit, onPick
                         ) {
                             Canvas(modifier = Modifier.size(26.dp)) {
                                 val lineColor = if (gridOn) CaptureAccentGreen else Color.White.copy(alpha = 0.65f)
-                                drawLine(lineColor, Offset(size.width / 2f, 0f), Offset(size.width / 2f, size.height), 1.dp.toPx())
-                                drawLine(lineColor, Offset(0f, size.height / 2f), Offset(size.width, size.height / 2f), 1.dp.toPx())
+                                for (i in 1..2) {
+                                    val fraction = i / 3f
+                                    drawLine(
+                                        lineColor,
+                                        Offset(size.width * fraction, 0f),
+                                        Offset(size.width * fraction, size.height),
+                                        1.dp.toPx()
+                                    )
+                                    drawLine(
+                                        lineColor,
+                                        Offset(0f, size.height * fraction),
+                                        Offset(size.width, size.height * fraction),
+                                        1.dp.toPx()
+                                    )
+                                }
                             }
                         }
                     }
