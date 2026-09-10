@@ -268,19 +268,61 @@ private fun processCapturedImage(
 
 /**
  * Converts a gallery-picked image into the final 1024x1024 image:
- * decode -> center-crop to a square (no guide overlay exists for a
- * picked photo, unlike the camera path) -> downscale to 1024x1024.
- * Returns null if the URI can't be opened or decoded.
+ * bounds-only decode -> compute inSampleSize -> downsampled decode ->
+ * rotate to match EXIF orientation -> center-crop to a square (no guide
+ * overlay exists for a picked photo, unlike the camera path) -> downscale
+ * to 1024x1024. Returns null if the URI can't be opened or decoded.
  */
 private fun processPickedImage(context: android.content.Context, uri: android.net.Uri): Bitmap? {
-    val rawBitmap = context.contentResolver.openInputStream(uri)?.use { stream ->
-        BitmapFactory.decodeStream(stream)
-    } ?: return null
+    val boundsStream = context.contentResolver.openInputStream(uri) ?: return null
+    val boundsOptions = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    boundsStream.use { BitmapFactory.decodeStream(it, null, boundsOptions) }
 
-    val crop = computeCenterSquareCrop(width = rawBitmap.width, height = rawBitmap.height)
-    val croppedBitmap = Bitmap.createBitmap(rawBitmap, crop.x, crop.y, crop.size, crop.size)
+    val decodeOptions = BitmapFactory.Options().apply {
+        inSampleSize = calculateInSampleSize(boundsOptions.outWidth, boundsOptions.outHeight, 1024)
+    }
+    val decodeStream = context.contentResolver.openInputStream(uri) ?: return null
+    val rawBitmap = decodeStream.use { BitmapFactory.decodeStream(it, null, decodeOptions) }
+        ?: return null
+
+    val exifStream = context.contentResolver.openInputStream(uri) ?: return null
+    val orientation = exifStream.use {
+        android.media.ExifInterface(it).getAttributeInt(
+            android.media.ExifInterface.TAG_ORIENTATION,
+            android.media.ExifInterface.ORIENTATION_NORMAL
+        )
+    }
+    val rotationDegrees = when (orientation) {
+        android.media.ExifInterface.ORIENTATION_ROTATE_90 -> 90
+        android.media.ExifInterface.ORIENTATION_ROTATE_180 -> 180
+        android.media.ExifInterface.ORIENTATION_ROTATE_270 -> 270
+        // ponytail: rotation only, not flip/mirror — add if real photos need it
+        else -> 0
+    }
+    val rotatedBitmap = if (rotationDegrees != 0) {
+        val matrix = Matrix().apply { postRotate(rotationDegrees.toFloat()) }
+        Bitmap.createBitmap(rawBitmap, 0, 0, rawBitmap.width, rawBitmap.height, matrix, true)
+    } else {
+        rawBitmap
+    }
+
+    val crop = computeCenterSquareCrop(width = rotatedBitmap.width, height = rotatedBitmap.height)
+    val croppedBitmap = Bitmap.createBitmap(rotatedBitmap, crop.x, crop.y, crop.size, crop.size)
 
     return Bitmap.createScaledBitmap(croppedBitmap, 1024, 1024, true)
+}
+
+/**
+ * Largest power-of-two sample size that keeps the decoded image's
+ * shorter side at or above [reqSize] — the eventual crop/scale target,
+ * so we never sample below what the final output needs.
+ */
+private fun calculateInSampleSize(width: Int, height: Int, reqSize: Int): Int {
+    var inSampleSize = 1
+    while (min(width, height) / (inSampleSize * 2) >= reqSize) {
+        inSampleSize *= 2
+    }
+    return inSampleSize
 }
 
 @Composable
