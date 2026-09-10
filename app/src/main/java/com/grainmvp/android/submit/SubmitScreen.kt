@@ -38,6 +38,8 @@ import com.grainmvp.android.network.toTextPart
 import com.grainmvp.android.session.incrementSampleId
 import com.grainmvp.android.ui.components.BlueprintFrame
 import com.grainmvp.android.ui.components.PrimaryActionButton
+import com.grainmvp.android.ui.components.blueprintCorners
+import com.grainmvp.android.ui.theme.Accent700
 import com.grainmvp.android.ui.theme.DividerColor
 import com.grainmvp.android.ui.theme.Neutral600
 import com.grainmvp.android.ui.theme.Neutral700
@@ -194,7 +196,11 @@ private fun SubmitFormScreen(
                 .fillMaxWidth()
                 .padding(top = 18.dp)
                 .aspectRatio(1f)
-                .border(1.dp, DividerColor)
+                .border(1.5.dp, DividerColor)
+                // Corner ticks matching the "blueprint" frame used
+                // elsewhere on this screen (the summary above), so the
+                // thumbnail reads as a clearly contained element.
+                .blueprintCorners(Accent700)
         ) {
             Image(
                 bitmap = image.asImageBitmap(),

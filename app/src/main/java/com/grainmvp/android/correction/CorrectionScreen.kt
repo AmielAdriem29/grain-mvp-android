@@ -54,6 +54,7 @@ import androidx.compose.ui.unit.sp
 import com.grainmvp.android.network.GrainBox
 import com.grainmvp.android.ui.components.SecondaryActionButton
 import com.grainmvp.android.ui.components.PrimaryActionButton
+import com.grainmvp.android.ui.components.blueprintCorners
 import com.grainmvp.android.ui.theme.Accent700
 import com.grainmvp.android.ui.theme.Accent900
 import com.grainmvp.android.ui.theme.AccentGreen
@@ -176,7 +177,12 @@ fun CorrectionScreen(
         BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
-                .border(width = 1.dp, color = DividerColor)
+                .border(width = 1.5.dp, color = DividerColor)
+                // Corner ticks matching the "blueprint" frame used
+                // elsewhere (session form, submit summary, result plate),
+                // so the image reads as a clearly contained element
+                // rather than blending into the page background.
+                .blueprintCorners(Accent700)
         ) {
             val displayScale = constraints.maxWidth.toFloat() / IMAGE_SIZE
             val boxSizePx = constraints.maxWidth.toFloat()
