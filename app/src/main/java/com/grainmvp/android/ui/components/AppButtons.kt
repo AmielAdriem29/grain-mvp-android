@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.grainmvp.android.ui.theme.AccentGreen
+import com.grainmvp.android.ui.theme.Accent900
 import com.grainmvp.android.ui.theme.DividerColor
 import com.grainmvp.android.ui.theme.TextPrimaryGranular
 
@@ -56,7 +57,7 @@ fun PrimaryActionButton(
         ),
         modifier = modifier
             .height(height)
-            .blueprintCorners(Color.White.copy(alpha = 0.85f))
+            .blueprintCorners(Accent900)
     ) {
         if (loading) {
             CircularProgressIndicator(
