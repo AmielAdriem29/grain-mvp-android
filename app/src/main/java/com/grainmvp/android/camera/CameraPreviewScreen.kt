@@ -1,10 +1,13 @@
 package com.grainmvp.android.camera
 
 import android.Manifest
+import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
+import android.media.ExifInterface
+import android.net.Uri
 import android.widget.FrameLayout
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
@@ -51,6 +54,13 @@ import androidx.core.content.ContextCompat
 import kotlin.math.min
 
 /**
+ * Fixed 1024x1024 — the single coordinate space every GrainBox in this
+ * whole system assumes. Do not change this without updating the
+ * backend/dashboard, which both assume it too.
+ */
+private const val OUTPUT_SIZE = 1024
+
+/**
  * Phase 1 (full): live camera preview + square guide + capture + crop +
  * downscale to 1024x1024, then a Review screen with Retake/Continue.
  *
@@ -74,11 +84,26 @@ fun CameraPreviewScreen(onImageConfirmed: (Bitmap) -> Unit) {
 
     var capturedImage by remember { mutableStateOf<Bitmap?>(null) }
 
-    if (!hasCameraPermission) {
-        PermissionRequestScreen(onRequestPermission = {
-            permissionLauncher.launch(Manifest.permission.CAMERA)
-        })
-        return
+    // Gallery picking needs no runtime permission, so its launcher lives
+    // here rather than inside CaptureScreen -- that lets both the
+    // permission-request screen and the capture screen offer it, even
+    // when the technician hasn't granted camera access yet.
+    val galleryLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            val bitmap = processPickedImage(context, uri)
+            if (bitmap != null) {
+                capturedImage = bitmap
+            }
+        }
+    }
+    val onPickFromGallery = {
+        galleryLauncher.launch(
+            androidx.activity.result.PickVisualMediaRequest(
+                androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly
+            )
+        )
     }
 
     val currentImage = capturedImage
@@ -88,13 +113,27 @@ fun CameraPreviewScreen(onImageConfirmed: (Bitmap) -> Unit) {
             onRetake = { capturedImage = null },
             onContinue = { onImageConfirmed(currentImage) }
         )
-    } else {
-        CaptureScreen(onCaptured = { bitmap -> capturedImage = bitmap })
+        return
     }
+
+    if (!hasCameraPermission) {
+        PermissionRequestScreen(
+            onRequestPermission = {
+                permissionLauncher.launch(Manifest.permission.CAMERA)
+            },
+            onPickFromGallery = onPickFromGallery
+        )
+        return
+    }
+
+    CaptureScreen(
+        onCaptured = { bitmap -> capturedImage = bitmap },
+        onPickFromGallery = onPickFromGallery
+    )
 }
 
 @Composable
-private fun PermissionRequestScreen(onRequestPermission: () -> Unit) {
+private fun PermissionRequestScreen(onRequestPermission: () -> Unit, onPickFromGallery: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -109,11 +148,19 @@ private fun PermissionRequestScreen(onRequestPermission: () -> Unit) {
         Button(onClick = onRequestPermission, modifier = Modifier.padding(top = 16.dp)) {
             Text("Grant camera permission")
         }
+        Text(
+            "Or scan a photo you've already saved:",
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.padding(top = 24.dp)
+        )
+        Button(onClick = onPickFromGallery, modifier = Modifier.padding(top = 8.dp)) {
+            Text("Choose from Gallery")
+        }
     }
 }
 
 @Composable
-private fun CaptureScreen(onCaptured: (Bitmap) -> Unit) {
+private fun CaptureScreen(onCaptured: (Bitmap) -> Unit, onPickFromGallery: () -> Unit) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     var imageCapture by remember { mutableStateOf<ImageCapture?>(null) }
@@ -154,7 +201,7 @@ private fun CaptureScreen(onCaptured: (Bitmap) -> Unit) {
                     )
                 }
 
-                // Bottom-anchored capture button, matching the wireframe.
+                // Bottom-anchored capture + gallery buttons, matching the wireframe.
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
@@ -162,34 +209,40 @@ private fun CaptureScreen(onCaptured: (Bitmap) -> Unit) {
                     verticalArrangement = Arrangement.Bottom,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Button(onClick = {
-                        val capture = imageCapture ?: return@Button
-                        capture.takePicture(
-                            ContextCompat.getMainExecutor(context),
-                            object : ImageCapture.OnImageCapturedCallback() {
-                                override fun onCaptureSuccess(image: ImageProxy) {
-                                    val finalBitmap = processCapturedImage(
-                                        image = image,
-                                        previewWidthPx = previewWidthPx,
-                                        previewHeightPx = previewHeightPx,
-                                        guideLeft = guideLeft,
-                                        guideTop = guideTop,
-                                        guideSize = guideSize
-                                    )
-                                    image.close()
-                                    onCaptured(finalBitmap)
-                                }
+                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        Button(onClick = onPickFromGallery) {
+                            Text("Choose from Gallery")
+                        }
 
-                                override fun onError(exception: ImageCaptureException) {
-                                    // Phase 5 polish adds a user-visible error
-                                    // message here. For now, the technician
-                                    // just sees the shutter didn't advance
-                                    // to Review and can tap again.
+                        Button(onClick = {
+                            val capture = imageCapture ?: return@Button
+                            capture.takePicture(
+                                ContextCompat.getMainExecutor(context),
+                                object : ImageCapture.OnImageCapturedCallback() {
+                                    override fun onCaptureSuccess(image: ImageProxy) {
+                                        val finalBitmap = processCapturedImage(
+                                            image = image,
+                                            previewWidthPx = previewWidthPx,
+                                            previewHeightPx = previewHeightPx,
+                                            guideLeft = guideLeft,
+                                            guideTop = guideTop,
+                                            guideSize = guideSize
+                                        )
+                                        image.close()
+                                        onCaptured(finalBitmap)
+                                    }
+
+                                    override fun onError(exception: ImageCaptureException) {
+                                        // Phase 5 polish adds a user-visible error
+                                        // message here. For now, the technician
+                                        // just sees the shutter didn't advance
+                                        // to Review and can tap again.
+                                    }
                                 }
-                            }
-                        )
-                    }) {
-                        Text("Capture Photo")
+                            )
+                        }) {
+                            Text("Capture Photo")
+                        }
                     }
                 }
             }
@@ -237,10 +290,71 @@ private fun processCapturedImage(
         rotatedBitmap, crop.x, crop.y, crop.size, crop.size
     )
 
-    // Fixed 1024x1024 — the single coordinate space every GrainBox in
-    // this whole system assumes. Do not change this without updating
-    // the backend/dashboard, which both assume it too.
-    return Bitmap.createScaledBitmap(croppedBitmap, 1024, 1024, true)
+    return Bitmap.createScaledBitmap(croppedBitmap, OUTPUT_SIZE, OUTPUT_SIZE, true)
+}
+
+/**
+ * Converts a gallery-picked image into the final 1024x1024 image:
+ * bounds-only decode -> compute inSampleSize -> downsampled decode ->
+ * rotate to match EXIF orientation -> center-crop to a square (no guide
+ * overlay exists for a picked photo, unlike the camera path) -> downscale
+ * to 1024x1024.
+ *
+ * Returns null if the URI can't be opened or decoded, if decoding throws
+ * (a missing/revoked URI grant, corrupt image or EXIF data, or an
+ * OutOfMemoryError on an extreme-aspect source the sample-size heuristic
+ * below can't shrink), or if the source is too small to fill the output
+ * size without upscaling past what the grading model should trust.
+ */
+private fun processPickedImage(context: Context, uri: Uri): Bitmap? {
+    return try {
+        val boundsStream = context.contentResolver.openInputStream(uri) ?: return null
+        val boundsOptions = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        boundsStream.use { BitmapFactory.decodeStream(it, null, boundsOptions) }
+
+        val decodeOptions = BitmapFactory.Options().apply {
+            inSampleSize = calculateInSampleSize(boundsOptions.outWidth, boundsOptions.outHeight, OUTPUT_SIZE)
+        }
+        val decodeStream = context.contentResolver.openInputStream(uri) ?: return null
+        val rawBitmap = decodeStream.use { BitmapFactory.decodeStream(it, null, decodeOptions) }
+            ?: return null
+
+        val exifStream = context.contentResolver.openInputStream(uri) ?: return null
+        val orientation = exifStream.use {
+            ExifInterface(it).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
+        }
+        val rotationDegrees = when (orientation) {
+            ExifInterface.ORIENTATION_ROTATE_90 -> 90
+            ExifInterface.ORIENTATION_ROTATE_180 -> 180
+            ExifInterface.ORIENTATION_ROTATE_270 -> 270
+            // ponytail: rotation only, not flip/mirror — add if real photos need it
+            else -> 0
+        }
+        val rotatedBitmap = if (rotationDegrees != 0) {
+            val matrix = Matrix().apply { postRotate(rotationDegrees.toFloat()) }
+            Bitmap.createBitmap(rawBitmap, 0, 0, rawBitmap.width, rawBitmap.height, matrix, true)
+        } else {
+            rawBitmap
+        }
+
+        val crop = computeCenterSquareCrop(width = rotatedBitmap.width, height = rotatedBitmap.height)
+        // A source smaller than the output would get silently upscaled into a
+        // well-formed-looking 1024x1024 image carrying far less real detail --
+        // reject it instead of feeding the grading model false confidence.
+        // Phase 5 polish adds a user-visible message here too (matching the
+        // camera-capture error path above) -- for now the technician just
+        // sees the picker close with no result and can try a different photo.
+        if (crop.size < OUTPUT_SIZE) return null
+
+        val croppedBitmap = Bitmap.createBitmap(rotatedBitmap, crop.x, crop.y, crop.size, crop.size)
+        Bitmap.createScaledBitmap(croppedBitmap, OUTPUT_SIZE, OUTPUT_SIZE, true)
+    } catch (e: Exception) {
+        android.util.Log.w("CameraPreviewScreen", "Gallery image processing failed", e)
+        null
+    } catch (e: OutOfMemoryError) {
+        android.util.Log.w("CameraPreviewScreen", "Gallery image processing ran out of memory", e)
+        null
+    }
 }
 
 @Composable
