@@ -25,6 +25,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -192,12 +193,13 @@ private fun SubmitFormScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 18.dp)
-                .aspectRatio(1.9f)
+                .aspectRatio(1f)
                 .border(1.dp, DividerColor)
         ) {
             Image(
                 bitmap = image.asImageBitmap(),
                 contentDescription = "Sample thumbnail",
+                contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()
             )
         }
