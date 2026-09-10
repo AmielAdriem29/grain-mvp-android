@@ -95,6 +95,12 @@ fun CameraPreviewScreen(onImageConfirmed: (Bitmap) -> Unit) {
             val bitmap = processPickedImage(context, uri)
             if (bitmap != null) {
                 capturedImage = bitmap
+            } else {
+                android.widget.Toast.makeText(
+                    context,
+                    "Couldn't use that photo — try one that's at least 1024x1024.",
+                    android.widget.Toast.LENGTH_LONG
+                ).show()
             }
         }
     }
@@ -340,10 +346,9 @@ private fun processPickedImage(context: Context, uri: Uri): Bitmap? {
         val crop = computeCenterSquareCrop(width = rotatedBitmap.width, height = rotatedBitmap.height)
         // A source smaller than the output would get silently upscaled into a
         // well-formed-looking 1024x1024 image carrying far less real detail --
-        // reject it instead of feeding the grading model false confidence.
-        // Phase 5 polish adds a user-visible message here too (matching the
-        // camera-capture error path above) -- for now the technician just
-        // sees the picker close with no result and can try a different photo.
+        // reject it instead of feeding the grading model false confidence. The
+        // caller (the gallery launcher's callback) shows a Toast when this
+        // returns null, covering both this case and any other decode failure.
         if (crop.size < OUTPUT_SIZE) return null
 
         val croppedBitmap = Bitmap.createBitmap(rotatedBitmap, crop.x, crop.y, crop.size, crop.size)
