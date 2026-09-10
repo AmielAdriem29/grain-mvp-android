@@ -106,6 +106,16 @@ fun CameraPreviewScreen(onImageConfirmed: (Bitmap) -> Unit) {
         )
     }
 
+    val currentImage = capturedImage
+    if (currentImage != null) {
+        ReviewScreen(
+            image = currentImage,
+            onRetake = { capturedImage = null },
+            onContinue = { onImageConfirmed(currentImage) }
+        )
+        return
+    }
+
     if (!hasCameraPermission) {
         PermissionRequestScreen(
             onRequestPermission = {
@@ -116,19 +126,10 @@ fun CameraPreviewScreen(onImageConfirmed: (Bitmap) -> Unit) {
         return
     }
 
-    val currentImage = capturedImage
-    if (currentImage != null) {
-        ReviewScreen(
-            image = currentImage,
-            onRetake = { capturedImage = null },
-            onContinue = { onImageConfirmed(currentImage) }
-        )
-    } else {
-        CaptureScreen(
-            onCaptured = { bitmap -> capturedImage = bitmap },
-            onPickFromGallery = onPickFromGallery
-        )
-    }
+    CaptureScreen(
+        onCaptured = { bitmap -> capturedImage = bitmap },
+        onPickFromGallery = onPickFromGallery
+    )
 }
 
 @Composable
@@ -340,13 +341,18 @@ private fun processPickedImage(context: Context, uri: Uri): Bitmap? {
         // A source smaller than the output would get silently upscaled into a
         // well-formed-looking 1024x1024 image carrying far less real detail --
         // reject it instead of feeding the grading model false confidence.
+        // Phase 5 polish adds a user-visible message here too (matching the
+        // camera-capture error path above) -- for now the technician just
+        // sees the picker close with no result and can try a different photo.
         if (crop.size < OUTPUT_SIZE) return null
 
         val croppedBitmap = Bitmap.createBitmap(rotatedBitmap, crop.x, crop.y, crop.size, crop.size)
         Bitmap.createScaledBitmap(croppedBitmap, OUTPUT_SIZE, OUTPUT_SIZE, true)
     } catch (e: Exception) {
+        android.util.Log.w("CameraPreviewScreen", "Gallery image processing failed", e)
         null
     } catch (e: OutOfMemoryError) {
+        android.util.Log.w("CameraPreviewScreen", "Gallery image processing ran out of memory", e)
         null
     }
 }
