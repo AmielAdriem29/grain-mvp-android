@@ -247,7 +247,13 @@ fun CorrectionScreen(
                             scaleX = zoom,
                             scaleY = zoom,
                             translationX = panOffset.x,
-                            translationY = panOffset.y
+                            translationY = panOffset.y,
+                            // Without this, graphicsLayer's scale/translation
+                            // paint outside the layer's own layout bounds --
+                            // it defaults to false. This is what confines the
+                            // zoomed/panned image to the square viewport
+                            // instead of overflowing it.
+                            clip = true
                         )
                 ) {
                     Image(
