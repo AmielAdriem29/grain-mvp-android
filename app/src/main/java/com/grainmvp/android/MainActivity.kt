@@ -105,12 +105,6 @@ fun GrainMvpApp() {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
-    // TEMPORARY debug toggle to reach NetworkTestScreen (throwaway,
-    // see network/NetworkTestScreen.kt). Only available from the
-    // Capture screen. Remove this toggle once real navigation exists
-    // and Phase 2 is verified -- this is not part of the real app flow.
-    var showNetworkTest by remember { mutableStateOf(false) }
-
     GrainMvpTheme {
         Surface(modifier = Modifier.fillMaxSize()) {
             when (val currentScreen = screen) {
@@ -133,6 +127,11 @@ fun GrainMvpApp() {
                 }
 
                 is Screen.Capture -> {
+                    // Hidden by default (showNetworkTestButton = false) so the button is hidden
+                    // from the UI while keeping the NetworkTestScreen feature preserved.
+                    val showNetworkTestButton = false
+                    var showNetworkTest by remember { mutableStateOf(false) }
+
                     Box(modifier = Modifier.fillMaxSize()) {
                         if (showNetworkTest) {
                             NetworkTestScreen()
@@ -150,27 +149,25 @@ fun GrainMvpApp() {
                             )
                         }
 
-                        // Styled to match the rest of the capture chrome
-                        // (GRID/LAMP: bordered dark pill, uppercase label)
-                        // rather than a default Material button, since this
-                        // sits directly over that same screen.
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .padding(8.dp)
-                                .background(Color.Black.copy(alpha = 0.72f))
-                                .border(1.dp, Color.White.copy(alpha = 0.35f))
-                                .clickable { showNetworkTest = !showNetworkTest }
-                                .padding(horizontal = 12.dp, vertical = 8.dp)
-                        ) {
-                            Text(
-                                if (showNetworkTest) "CAMERA" else "NETWORK TEST",
-                                color = Color.White,
-                                fontFamily = FontFamily.SansSerif,
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 12.sp,
-                                letterSpacing = 0.8.sp
-                            )
+                        if (showNetworkTestButton) {
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(8.dp)
+                                    .background(Color.Black.copy(alpha = 0.72f))
+                                    .border(1.dp, Color.White.copy(alpha = 0.35f))
+                                    .clickable { showNetworkTest = !showNetworkTest }
+                                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                            ) {
+                                Text(
+                                    if (showNetworkTest) "CAMERA" else "NETWORK TEST",
+                                    color = Color.White,
+                                    fontFamily = FontFamily.SansSerif,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 12.sp,
+                                    letterSpacing = 0.8.sp
+                                )
+                            }
                         }
                     }
                 }
