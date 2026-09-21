@@ -184,4 +184,130 @@ class CorrectionLogicTest {
     fun `whitespace-only is invalid`() {
         assertEquals(false, isValidWeightValue("   "))
     }
+
+    // ---- applyGrainTap (screen 05's explicit Remove/Add mode) ----
+
+    @Test
+    fun `remove mode tapping an untouched box marks it removed`() {
+        val grains = listOf(
+            GrainBox(x = 100, y = 100, width = 24, height = 24, confidence = 0.8f, action = null)
+        )
+
+        val result = applyGrainTap(grains, imageX = 110f, imageY = 110f, mode = GrainCorrectionMode.REMOVE)
+
+        assertEquals("removed", result[0].action)
+    }
+
+    @Test
+    fun `remove mode tapping an already-removed box un-removes it`() {
+        val grains = listOf(
+            GrainBox(x = 100, y = 100, width = 24, height = 24, confidence = 0.8f, action = "removed")
+        )
+
+        val result = applyGrainTap(grains, imageX = 110f, imageY = 110f, mode = GrainCorrectionMode.REMOVE)
+
+        assertNull(result[0].action)
+    }
+
+    @Test
+    fun `remove mode tapping empty space does nothing`() {
+        val grains = listOf(
+            GrainBox(x = 100, y = 100, width = 24, height = 24, confidence = 0.8f, action = null)
+        )
+
+        val result = applyGrainTap(grains, imageX = 500f, imageY = 500f, mode = GrainCorrectionMode.REMOVE)
+
+        assertEquals(grains, result)
+    }
+
+    @Test
+    fun `add mode tapping empty space adds a new box`() {
+        val grains = listOf(
+            GrainBox(x = 100, y = 100, width = 24, height = 24, confidence = 0.8f, action = null)
+        )
+
+        val result = applyGrainTap(grains, imageX = 500f, imageY = 500f, mode = GrainCorrectionMode.ADD)
+
+        assertEquals(2, result.size)
+        assertEquals("added", result[1].action)
+        assertEquals(500, result[1].x)
+        assertEquals(500, result[1].y)
+    }
+
+    @Test
+    fun `add mode tapping an existing box does nothing`() {
+        val grains = listOf(
+            GrainBox(x = 100, y = 100, width = 24, height = 24, confidence = 0.8f, action = null)
+        )
+
+        val result = applyGrainTap(grains, imageX = 110f, imageY = 110f, mode = GrainCorrectionMode.ADD)
+
+        assertEquals(grains, result)
+        assertEquals(1, result.size)
+    }
+
+    // ---- screenTapToImageCoords (screen 05's pinch-zoom + pan) ----
+
+    @Test
+    fun `screenTapToImageCoords at zoom 1x with no pan matches plain displayScale division`() {
+        // Same formula as every findTappedBoxIndex test above pre-dates
+        // zoom: imageX = screenX / displayScale.
+        val (x, y) = screenTapToImageCoords(
+            screenX = 210f, screenY = 210f,
+            boxSizePx = 1000f, displayScale = 1000f / 1024f,
+            zoom = 1f, panX = 0f, panY = 0f
+        )
+
+        assertEquals(215.04f, x, 0.01f)
+        assertEquals(215.04f, y, 0.01f)
+    }
+
+    @Test
+    fun `screenTapToImageCoords at the box center is unaffected by zoom`() {
+        // Zoom scales around the box center, so a tap exactly there maps
+        // to the same content point regardless of zoom level.
+        val (x, y) = screenTapToImageCoords(
+            screenX = 500f, screenY = 500f,
+            boxSizePx = 1000f, displayScale = 1000f / 1024f,
+            zoom = 3f, panX = 0f, panY = 0f
+        )
+
+        assertEquals(512f, x, 0.01f)
+        assertEquals(512f, y, 0.01f)
+    }
+
+    @Test
+    fun `screenTapToImageCoords accounts for pan offset`() {
+        // Zoomed 2x and panned 100px right/down: content_x = 500 +
+        // (500 - 500 - 100) / 2 = 450 -> imageX = 450 / (1000/1024).
+        val (x, y) = screenTapToImageCoords(
+            screenX = 500f, screenY = 500f,
+            boxSizePx = 1000f, displayScale = 1000f / 1024f,
+            zoom = 2f, panX = 100f, panY = 100f
+        )
+
+        assertEquals(460.8f, x, 0.01f)
+        assertEquals(460.8f, y, 0.01f)
+    }
+
+    // ---- clampPan (screen 05's pinch-zoom + pan) ----
+
+    @Test
+    fun `clampPan allows no pan at all at zoom 1x`() {
+        assertEquals(0f, clampPan(pan = 250f, boxSizePx = 1000f, zoom = 1f), 0.01f)
+        assertEquals(0f, clampPan(pan = -250f, boxSizePx = 1000f, zoom = 1f), 0.01f)
+    }
+
+    @Test
+    fun `clampPan caps pan at the zoomed content's overhang at 2x zoom`() {
+        // Content is 2x the box size (2000px for a 1000px box), so it
+        // overhangs the viewport by 1000px total -- 500px on each side.
+        assertEquals(500f, clampPan(pan = 9999f, boxSizePx = 1000f, zoom = 2f), 0.01f)
+        assertEquals(-500f, clampPan(pan = -9999f, boxSizePx = 1000f, zoom = 2f), 0.01f)
+    }
+
+    @Test
+    fun `clampPan leaves an in-range pan value untouched`() {
+        assertEquals(100f, clampPan(pan = 100f, boxSizePx = 1000f, zoom = 2f), 0.01f)
+    }
 }
