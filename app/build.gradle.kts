@@ -2,8 +2,8 @@ import java.util.Properties
 
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.serialization")
+    id("org.jetbrains.kotlin.plugin.compose") version "2.4.21"
 }
 
 // Secrets (BASE_URL, API_KEY) live in local.properties, which is
@@ -19,7 +19,7 @@ val localProperties = Properties().apply {
 
 android {
     namespace = "com.grainmvp.android"
-    compileSdk = 34
+    compileSdk = 37
 
     signingConfigs {
         getByName("debug") {
