@@ -44,11 +44,6 @@ android {
             "BACKEND_BASE_URL",
             "\"${localProperties.getProperty("backend.baseUrl", "http://10.0.2.2:8000")}\""
         )
-        buildConfigField(
-            "String",
-            "BACKEND_API_KEY",
-            "\"${localProperties.getProperty("backend.apiKey", "REPLACE_ME_IN_LOCAL_PROPERTIES")}\""
-        )
     }
 
     buildFeatures {
