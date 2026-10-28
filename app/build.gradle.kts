@@ -60,10 +60,6 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
-    }
-
     packaging {
         // CameraX 1.3.4 ships libimage_processing_util_jni.so with non-16KB alignment.
         // This is a known issue with older CameraX; the warning is suppressed here.
