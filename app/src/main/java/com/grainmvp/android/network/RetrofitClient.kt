@@ -28,8 +28,16 @@ object RetrofitClient {
 
     private val okHttpClient: OkHttpClient by lazy {
         OkHttpClient.Builder()
+            .addInterceptor(AuthInterceptor { SupabaseAuth.accessTokenOrNull() })
             .addInterceptor(
-                HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BODY },
+                HttpLoggingInterceptor().apply {
+                    redactHeader("Authorization")
+                    level = if (BuildConfig.DEBUG) {
+                        HttpLoggingInterceptor.Level.BASIC
+                    } else {
+                        HttpLoggingInterceptor.Level.NONE
+                    }
+                },
             )
             // Spec: "Set a 30-second timeout on the HTTP client."
             .connectTimeout(30, TimeUnit.SECONDS)

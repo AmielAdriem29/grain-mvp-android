@@ -44,6 +44,16 @@ android {
             "BACKEND_BASE_URL",
             "\"${localProperties.getProperty("backend.baseUrl", "http://10.0.2.2:8000")}\""
         )
+        buildConfigField(
+            "String",
+            "SUPABASE_URL",
+            "\"${localProperties.getProperty("supabase.url", "https://YOUR-PROJECT.supabase.co")}\""
+        )
+        buildConfigField(
+            "String",
+            "SUPABASE_PUB_KEY",
+            "\"${localProperties.getProperty("supabase.pubKey", "REPLACE_ME_IN_LOCAL_PROPERTIES")}\""
+        )
     }
 
     buildFeatures {
@@ -106,6 +116,10 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+
+    implementation(platform("io.github.jan-tennert.supabase:bom:3.8.0"))
+    implementation("io.github.jan-tennert.supabase:auth-kt")
+    implementation("io.ktor:ktor-client-okhttp:3.6.0")
 
     // Unit testing — used first for CropMath, the trickiest pure logic
     // in Phase 1. Runs on the JVM, no emulator/device needed.

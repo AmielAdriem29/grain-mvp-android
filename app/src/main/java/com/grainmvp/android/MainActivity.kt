@@ -12,9 +12,13 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Column
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -36,6 +40,7 @@ import com.grainmvp.android.home.StartSessionScreen
 import com.grainmvp.android.home.WelcomeScreen
 import com.grainmvp.android.network.GrainBox
 import com.grainmvp.android.network.NetworkTestScreen
+import com.grainmvp.android.network.SupabaseAuth
 import com.grainmvp.android.session.incrementSampleId
 import com.grainmvp.android.submit.QueuedReplicate
 import com.grainmvp.android.submit.SubmitScreen
@@ -86,8 +91,47 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+private sealed class AuthState {
+    data object Loading : AuthState()
+    data object Ready : AuthState()
+    data class Failed(val message: String) : AuthState()
+}
+
 @Composable
 fun GrainMvpApp() {
+    var authState by remember { mutableStateOf<AuthState>(AuthState.Loading) }
+    var authAttempt by remember { mutableStateOf(0) }
+
+    LaunchedEffect(authAttempt) {
+        authState = AuthState.Loading
+        authState = try {
+            SupabaseAuth.ensureSignedIn()
+            AuthState.Ready
+        } catch (e: Exception) {
+            AuthState.Failed("${e.javaClass.simpleName}: ${e.message}")
+        }
+    }
+
+    if (authState !is AuthState.Ready) {
+        GrainMvpTheme {
+            Surface(modifier = Modifier.fillMaxSize()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    when (val state = authState) {
+                        is AuthState.Failed -> Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.padding(24.dp)
+                        ) {
+                            Text("Couldn't connect: ${state.message}")
+                            Button(onClick = { authAttempt++ }) { Text("Retry") }
+                        }
+                        else -> CircularProgressIndicator()
+                    }
+                }
+            }
+        }
+        return
+    }
+
     var screen by remember { mutableStateOf<Screen>(Screen.Welcome) }
 
     // Simple in-memory default (no persistence needed) so returning to
