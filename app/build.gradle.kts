@@ -2,8 +2,8 @@ import java.util.Properties
 
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.serialization")
+    id("org.jetbrains.kotlin.plugin.compose") version "2.4.21"
 }
 
 // Secrets (BASE_URL, API_KEY) live in local.properties, which is
@@ -19,7 +19,7 @@ val localProperties = Properties().apply {
 
 android {
     namespace = "com.grainmvp.android"
-    compileSdk = 34
+    compileSdk = 37
 
     signingConfigs {
         getByName("debug") {
@@ -46,8 +46,13 @@ android {
         )
         buildConfigField(
             "String",
-            "BACKEND_API_KEY",
-            "\"${localProperties.getProperty("backend.apiKey", "REPLACE_ME_IN_LOCAL_PROPERTIES")}\""
+            "SUPABASE_URL",
+            "\"${localProperties.getProperty("supabase.url", "https://YOUR-PROJECT.supabase.co")}\""
+        )
+        buildConfigField(
+            "String",
+            "SUPABASE_PUB_KEY",
+            "\"${localProperties.getProperty("supabase.pubKey", "REPLACE_ME_IN_LOCAL_PROPERTIES")}\""
         )
     }
 
@@ -63,10 +68,6 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
-    }
-
-    kotlinOptions {
-        jvmTarget = "17"
     }
 
     packaging {
@@ -115,6 +116,10 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+
+    implementation(platform("io.github.jan-tennert.supabase:bom:3.8.0"))
+    implementation("io.github.jan-tennert.supabase:auth-kt")
+    implementation("io.ktor:ktor-client-okhttp:3.6.0")
 
     // Unit testing — used first for CropMath, the trickiest pure logic
     // in Phase 1. Runs on the JVM, no emulator/device needed.
