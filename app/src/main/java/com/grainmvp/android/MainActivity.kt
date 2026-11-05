@@ -35,7 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.grainmvp.android.camera.CameraPreviewScreen
 import com.grainmvp.android.correction.CorrectionScreen
-import com.grainmvp.android.dev.FAKE_GRAINS_FOR_DEV_ONLY
+import com.grainmvp.android.detect.DetectScreen
 import com.grainmvp.android.home.StartSessionScreen
 import com.grainmvp.android.home.WelcomeScreen
 import com.grainmvp.android.network.GrainBox
@@ -71,7 +71,13 @@ private sealed class Screen {
     data object Welcome : Screen()
     data object StartSession : Screen()
     data class Capture(val technicianName: String, val sampleId: String) : Screen()
-    data class Correction(val image: Bitmap, val technicianName: String, val sampleId: String) : Screen()
+    data class Detecting(val image: Bitmap, val technicianName: String, val sampleId: String) : Screen()
+    data class Correction(
+        val image: Bitmap,
+        val predictedGrains: List<GrainBox>,
+        val technicianName: String,
+        val sampleId: String
+    ) : Screen()
     data class Submit(
         val image: Bitmap,
         val aiPredictedGrains: List<GrainBox>,
@@ -184,7 +190,7 @@ fun GrainMvpApp() {
                                 technicianName = currentScreen.technicianName,
                                 sampleId = currentScreen.sampleId,
                                 onImageConfirmed = { bitmap ->
-                                    screen = Screen.Correction(
+                                    screen = Screen.Detecting(
                                         image = bitmap,
                                         technicianName = currentScreen.technicianName,
                                         sampleId = currentScreen.sampleId
@@ -216,15 +222,33 @@ fun GrainMvpApp() {
                     }
                 }
 
+                is Screen.Detecting -> {
+                    DetectScreen(
+                        image = currentScreen.image,
+                        technicianName = currentScreen.technicianName,
+                        sampleId = currentScreen.sampleId,
+                        onDetected = { grains ->
+                            screen = Screen.Correction(
+                                image = currentScreen.image,
+                                predictedGrains = grains,
+                                technicianName = currentScreen.technicianName,
+                                sampleId = currentScreen.sampleId
+                            )
+                        },
+                        onRetake = {
+                            screen = Screen.Capture(currentScreen.technicianName, currentScreen.sampleId)
+                        }
+                    )
+                }
+
                 is Screen.Correction -> {
                     CorrectionScreen(
                         image = currentScreen.image,
-                        // TEMPORARY: real predicted grains come from Phase 2's
+                        initialGrains = currentScreen.predictedGrains,
                         // predict() once verified against a real backend. See
                         // dev/FakeGrainsForDev.kt -- delete this fake data and
                         // call the real endpoint instead once Sitoy's server
                         // is reachable.
-                        initialGrains = FAKE_GRAINS_FOR_DEV_ONLY,
                         onRetakePhoto = {
                             screen = Screen.Capture(currentScreen.technicianName, currentScreen.sampleId)
                         },
@@ -234,8 +258,7 @@ fun GrainMvpApp() {
                                 // The "unmodified original AI list" the spec
                                 // requires for aiPredictedGrains is exactly
                                 // what Correction started from -- currently
-                                // the same fake data, until Phase 2 is real.
-                                aiPredictedGrains = FAKE_GRAINS_FOR_DEV_ONLY,
+                                aiPredictedGrains = currentScreen.predictedGrains,
                                 confirmedGrains = confirmedGrains,
                                 weight = weight,
                                 technicianName = currentScreen.technicianName,
