@@ -133,6 +133,6 @@ fun FailureScreen(
  * for; everything else gets a sensible generic fallback.
  */
 private fun friendlyErrorMessage(exceptionClassName: String): String = when (exceptionClassName) {
-    "SocketTimeoutException" -> "The server didn't answer in 30 seconds."
+    "SocketTimeoutException" -> "The server took too long to answer."
     else -> "Something went wrong sending this sample."
 }
