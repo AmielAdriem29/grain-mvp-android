@@ -82,7 +82,7 @@ private const val ZOOM_STEP = 1.5f
  *
  * Replaces the old "the weak screen today" version with:
  *  - a live running count: AI detected vs. you removed/added, computed
- *    reactively as confirmedCount = initialGrains.size - removed + added
+ *    reactively as the number of boxes not marked removed
  *  - an explicit Remove/Add mode (the segmented control below the
  *    image), so a tap is never ambiguous about what it will do -- see
  *    [GrainCorrectionMode] / [applyGrainTap] in CorrectionLogic.kt
@@ -124,7 +124,7 @@ fun CorrectionScreen(
     val aiCount = initialGrains.size
     val removedCount = grains.count { it.action == "removed" }
     val addedCount = grains.count { it.action == "added" }
-    val confirmedCount = aiCount - removedCount + addedCount
+    val confirmedCount = grains.count { it.action != "removed" }
 
     fun applyTap(imageX: Float, imageY: Float) {
         val updated = applyGrainTap(grains, imageX, imageY, mode)
