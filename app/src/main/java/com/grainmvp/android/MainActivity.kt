@@ -33,7 +33,7 @@ import com.grainmvp.android.home.StartSessionScreen
 import com.grainmvp.android.home.WelcomeScreen
 import com.grainmvp.android.network.GrainBox
 import com.grainmvp.android.network.SupabaseAuth
-import com.grainmvp.android.session.incrementSampleId
+import com.grainmvp.android.session.SessionInfo
 import com.grainmvp.android.submit.QueuedReplicate
 import com.grainmvp.android.submit.SubmitScreen
 import com.grainmvp.android.submit.submitQueuedReplicate
@@ -46,8 +46,8 @@ import kotlinx.coroutines.launch
  *  - Welcome (opening splash)
  *  - Start Session (technician + sample ID -- collected once here, not
  *    on Submit anymore)
- *  - Capture -> Correction -> Submit, all carrying technicianName/
- *    sampleId through as plain parameters
+ *  - Capture -> Detect -> Correction -> Submit, all carrying the same
+ *    [SessionInfo] (technician and sample ID)
  *  - Submit's Result screen's "Next sample" skips straight back to
  *    Capture with the same technician and an incremented sample ID,
  *    bypassing Start Session
@@ -62,21 +62,19 @@ import kotlinx.coroutines.launch
 private sealed class Screen {
     data object Welcome : Screen()
     data object StartSession : Screen()
-    data class Capture(val technicianName: String, val sampleId: String) : Screen()
-    data class Detecting(val image: Bitmap, val technicianName: String, val sampleId: String) : Screen()
+    data class Capture(val session: SessionInfo) : Screen()
+    data class Detecting(val image: Bitmap, val session: SessionInfo) : Screen()
     data class Correction(
         val image: Bitmap,
         val predictedGrains: List<GrainBox>,
-        val technicianName: String,
-        val sampleId: String
+        val session: SessionInfo
     ) : Screen()
     data class Submit(
         val image: Bitmap,
         val aiPredictedGrains: List<GrainBox>,
         val confirmedGrains: List<GrainBox>,
         val weight: String,
-        val technicianName: String,
-        val sampleId: String
+        val session: SessionInfo
     ) : Screen()
 }
 
@@ -161,22 +159,18 @@ fun GrainMvpApp() {
                         onSendQueued = {
                             scope.launch { sendQueuedReplicates(context, replicateQueue) }
                         },
-                        onStartScan = { technicianName, sampleId ->
-                            lastTechnicianName = technicianName
-                            screen = Screen.Capture(technicianName, sampleId)
+                        onStartScan = { session ->
+                            lastTechnicianName = session.technicianName
+                            screen = Screen.Capture(session)
                         }
                     )
                 }
 
                 is Screen.Capture -> {
                     CameraPreviewScreen(
-                        sampleId = currentScreen.sampleId,
+                        sampleId = currentScreen.session.sampleId,
                         onImageConfirmed = { bitmap ->
-                            screen = Screen.Detecting(
-                                image = bitmap,
-                                technicianName = currentScreen.technicianName,
-                                sampleId = currentScreen.sampleId
-                            )
+                            screen = Screen.Detecting(image = bitmap, session = currentScreen.session)
                         }
                     )
                 }
@@ -184,18 +178,16 @@ fun GrainMvpApp() {
                 is Screen.Detecting -> {
                     DetectScreen(
                         image = currentScreen.image,
-                        technicianName = currentScreen.technicianName,
-                        sampleId = currentScreen.sampleId,
+                        session = currentScreen.session,
                         onDetected = { grains ->
                             screen = Screen.Correction(
                                 image = currentScreen.image,
                                 predictedGrains = grains,
-                                technicianName = currentScreen.technicianName,
-                                sampleId = currentScreen.sampleId
+                                session = currentScreen.session
                             )
                         },
                         onRetake = {
-                            screen = Screen.Capture(currentScreen.technicianName, currentScreen.sampleId)
+                            screen = Screen.Capture(currentScreen.session)
                         }
                     )
                 }
@@ -204,24 +196,19 @@ fun GrainMvpApp() {
                     CorrectionScreen(
                         image = currentScreen.image,
                         initialGrains = currentScreen.predictedGrains,
-                        // predict() once verified against a real backend. See
-                        // dev/FakeGrainsForDev.kt -- delete this fake data and
-                        // call the real endpoint instead once Sitoy's server
-                        // is reachable.
                         onRetakePhoto = {
-                            screen = Screen.Capture(currentScreen.technicianName, currentScreen.sampleId)
+                            screen = Screen.Capture(currentScreen.session)
                         },
                         onSubmit = { confirmedGrains, weight ->
                             screen = Screen.Submit(
                                 image = currentScreen.image,
                                 // The "unmodified original AI list" the spec
                                 // requires for aiPredictedGrains is exactly
-                                // what Correction started from -- currently
+                                // what Correction started from.
                                 aiPredictedGrains = currentScreen.predictedGrains,
                                 confirmedGrains = confirmedGrains,
                                 weight = weight,
-                                technicianName = currentScreen.technicianName,
-                                sampleId = currentScreen.sampleId
+                                session = currentScreen.session
                             )
                         }
                     )
@@ -229,30 +216,26 @@ fun GrainMvpApp() {
 
                 is Screen.Submit -> {
                     SubmitScreen(
-                        technicianName = currentScreen.technicianName,
-                        sampleId = currentScreen.sampleId,
+                        session = currentScreen.session,
                         image = currentScreen.image,
                         aiPredictedGrains = currentScreen.aiPredictedGrains,
                         confirmedGrains = currentScreen.confirmedGrains,
                         weight = currentScreen.weight,
                         onEndSession = { screen = Screen.Welcome },
-                        onNextSample = { technicianName, nextSampleId ->
-                            lastTechnicianName = technicianName
-                            screen = Screen.Capture(technicianName, nextSampleId)
+                        onNextSample = { nextSession ->
+                            lastTechnicianName = nextSession.technicianName
+                            screen = Screen.Capture(nextSession)
                         },
                         onKeepOnDevice = { queuedItem ->
                             replicateQueue.add(queuedItem)
-                            lastTechnicianName = queuedItem.technicianName
+                            lastTechnicianName = queuedItem.session.technicianName
                             // "...or keep scanning and send it later" (the
                             // Failure screen's own copy) means continuing to
                             // the next sample, not ending the session --
                             // same shape as Result's "Next sample": same
                             // technician, incremented ID, straight back to
                             // Capture.
-                            screen = Screen.Capture(
-                                queuedItem.technicianName,
-                                incrementSampleId(queuedItem.sampleId)
-                            )
+                            screen = Screen.Capture(queuedItem.session.nextSample())
                         }
                     )
                 }

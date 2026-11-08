@@ -31,7 +31,7 @@ import androidx.compose.ui.unit.sp
 import com.grainmvp.android.ImageSpec
 import com.grainmvp.android.network.GrainBox
 import com.grainmvp.android.network.ReplicateResponse
-import com.grainmvp.android.session.incrementSampleId
+import com.grainmvp.android.session.SessionInfo
 import com.grainmvp.android.ui.components.BlueprintFrame
 import com.grainmvp.android.ui.components.PrimaryActionButton
 import com.grainmvp.android.ui.components.blueprintCorners
@@ -52,7 +52,7 @@ import kotlinx.coroutines.launch
  * The substantive change from the old SubmitScreen: this screen no
  * longer collects technicianName/sampleId -- those are now collected
  * earlier, on home/StartSessionScreen.kt (screen 02), and carried
- * through Capture/Correction as plain parameters (see MainActivity's
+ * through Capture/Correction as a SessionInfo (see MainActivity's
  * Screen sealed class). By the time the technician reaches this screen,
  * it's a read-only confirmation of what will be sent, not a form.
  */
@@ -65,14 +65,13 @@ private sealed class SubmitState {
 
 @Composable
 fun SubmitScreen(
-    technicianName: String,
-    sampleId: String,
+    session: SessionInfo,
     image: Bitmap,
     aiPredictedGrains: List<GrainBox>,
     confirmedGrains: List<GrainBox>,
     weight: String,
     onEndSession: () -> Unit,
-    onNextSample: (technicianName: String, nextSampleId: String) -> Unit,
+    onNextSample: (nextSession: SessionInfo) -> Unit,
     // Called with everything needed to retry this submission later, once
     // the technician taps "Keep on device" on the Failure screen -- see
     // MainActivity's replicateQueue and ReplicateQueue.kt.
@@ -86,7 +85,7 @@ fun SubmitScreen(
         scope.launch {
             try {
                 val response = submitQueuedReplicate(
-                    QueuedReplicate(image, technicianName, sampleId, aiPredictedGrains, confirmedGrains, weight)
+                    QueuedReplicate(image, session, aiPredictedGrains, confirmedGrains, weight)
                 )
                 state = SubmitState.Success(response)
             } catch (e: Exception) {
@@ -104,31 +103,29 @@ fun SubmitScreen(
         is SubmitState.Success -> {
             ResultScreen(
                 response = currentState.response,
-                technicianName = technicianName,
-                sampleId = sampleId,
+                session = session,
                 weight = weight,
                 confirmedGrainCount = confirmedGrains.size,
-                onNextSample = { onNextSample(technicianName, incrementSampleId(sampleId)) },
+                onNextSample = { onNextSample(session.nextSample()) },
                 onEndSession = onEndSession
             )
         }
         is SubmitState.Error -> {
             FailureScreen(
                 exceptionClassName = currentState.exceptionClassName,
-                sampleId = sampleId,
+                sampleId = session.sampleId,
                 confirmedGrainCount = confirmedGrains.size,
                 onRetry = { submit() },
                 onKeepOnDevice = {
                     onKeepOnDevice(
-                        QueuedReplicate(image, technicianName, sampleId, aiPredictedGrains, confirmedGrains, weight)
+                        QueuedReplicate(image, session, aiPredictedGrains, confirmedGrains, weight)
                     )
                 }
             )
         }
         else -> {
             SubmitFormScreen(
-                technicianName = technicianName,
-                sampleId = sampleId,
+                session = session,
                 weight = weight,
                 image = image,
                 aiCount = aiPredictedGrains.size,
@@ -142,8 +139,7 @@ fun SubmitScreen(
 
 @Composable
 private fun SubmitFormScreen(
-    technicianName: String,
-    sampleId: String,
+    session: SessionInfo,
     weight: String,
     image: Bitmap,
     aiCount: Int,
@@ -170,9 +166,9 @@ private fun SubmitFormScreen(
                 .fillMaxWidth()
                 .padding(top = 18.dp)
         ) {
-            SummaryRow("Technician", technicianName)
+            SummaryRow("Technician", session.technicianName)
             RowDivider()
-            SummaryRow("Sample ID", sampleId)
+            SummaryRow("Sample ID", session.sampleId)
             RowDivider()
             SummaryRow("Weight", "$weight g")
             RowDivider()

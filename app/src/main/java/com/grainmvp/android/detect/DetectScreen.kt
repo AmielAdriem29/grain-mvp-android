@@ -28,6 +28,7 @@ import com.grainmvp.android.network.GrainBox
 import com.grainmvp.android.network.RetrofitClient
 import com.grainmvp.android.network.toImagePart
 import com.grainmvp.android.network.toTextPart
+import com.grainmvp.android.session.SessionInfo
 import com.grainmvp.android.ui.components.BlueprintFrame
 import com.grainmvp.android.ui.components.PrimaryActionButton
 import com.grainmvp.android.ui.components.SecondaryActionButton
@@ -41,18 +42,17 @@ import com.grainmvp.android.ui.theme.SurfaceBg
 import com.grainmvp.android.ui.theme.TextPrimaryGranular
 import kotlinx.coroutines.CancellationException
 
-suspend fun predictGrains(image: Bitmap, technicianName: String, sampleId: String): List<GrainBox> =
+suspend fun predictGrains(image: Bitmap, session: SessionInfo): List<GrainBox> =
     RetrofitClient.apiService.predict(
         image = image.toImagePart(),
-        technicianName = technicianName.toTextPart(),
-        sampleId = sampleId.toTextPart()
+        technicianName = session.technicianName.toTextPart(),
+        sampleId = session.sampleId.toTextPart()
     ).grains
 
 @Composable
 fun DetectScreen(
     image: Bitmap,
-    technicianName: String,
-    sampleId: String,
+    session: SessionInfo,
     onDetected: (List<GrainBox>) -> Unit,
     onRetake: () -> Unit
 ) {
@@ -62,7 +62,7 @@ fun DetectScreen(
     LaunchedEffect(attempt) {
         errorClassName = null
         try {
-            onDetected(predictGrains(image, technicianName, sampleId))
+            onDetected(predictGrains(image, session))
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -85,7 +85,7 @@ fun DetectScreen(
                     color = TextPrimaryGranular
                 )
                 Text(
-                    sampleId,
+                    session.sampleId,
                     modifier = Modifier.padding(top = 4.dp),
                     fontSize = 12.sp,
                     color = Neutral600

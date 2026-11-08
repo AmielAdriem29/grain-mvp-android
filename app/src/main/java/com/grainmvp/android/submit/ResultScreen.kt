@@ -16,7 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.grainmvp.android.network.ReplicateResponse
-import com.grainmvp.android.session.incrementSampleId
+import com.grainmvp.android.session.SessionInfo
 import com.grainmvp.android.ui.components.BlueprintFrame
 import com.grainmvp.android.ui.components.PrimaryActionButton
 import com.grainmvp.android.ui.components.SecondaryActionButton
@@ -36,8 +36,7 @@ import kotlin.math.roundToInt
 @Composable
 fun ResultScreen(
     response: ReplicateResponse,
-    technicianName: String,
-    sampleId: String,
+    session: SessionInfo,
     weight: String,
     confirmedGrainCount: Int,
     onNextSample: () -> Unit,
@@ -52,7 +51,7 @@ fun ResultScreen(
     } else {
         confirmedGrainCount
     }
-    val nextSampleId = incrementSampleId(sampleId)
+    val nextSampleId = session.nextSample().sampleId
 
     Column(
         modifier = Modifier
@@ -61,7 +60,7 @@ fun ResultScreen(
             .padding(20.dp)
     ) {
         Text(
-            "Recorded · $sampleId",
+            "Recorded · ${session.sampleId}",
             fontFamily = FontFamily.SansSerif,
             fontWeight = FontWeight.SemiBold,
             fontSize = 11.sp,
@@ -109,7 +108,7 @@ fun ResultScreen(
             RowDivider()
             SummaryRow("Weight", "$weight g")
             RowDivider()
-            SummaryRow("Technician", technicianName)
+            SummaryRow("Technician", session.technicianName)
         }
 
         Spacer(modifier = Modifier.weight(1f))
