@@ -1,12 +1,8 @@
 package com.grainmvp.android.camera
 
 import android.Manifest
-import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.graphics.Matrix
-import android.media.ExifInterface
 import android.net.Uri
 import android.widget.FrameLayout
 import androidx.camera.core.Camera
@@ -472,112 +468,6 @@ private fun CaptureChromeCell(label: String, icon: @Composable () -> Unit) {
             fontSize = 11.sp,
             letterSpacing = 1.sp
         )
-    }
-}
-
-/**
- * Converts a raw camera capture into the final 1024x1024 image:
- * decode -> rotate to match sensor orientation -> crop to the guide's
- * region (via computeCropRegion) -> downscale to exactly 1024x1024.
- */
-private fun processCapturedImage(
-    image: ImageProxy,
-    previewWidthPx: Float,
-    previewHeightPx: Float,
-    guideLeft: Float,
-    guideTop: Float,
-    guideSize: Float
-): Bitmap {
-    val buffer = image.planes[0].buffer
-    val bytes = ByteArray(buffer.remaining())
-    buffer.get(bytes)
-    val rawBitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-
-    val rotationDegrees = image.imageInfo.rotationDegrees
-    val rotatedBitmap = if (rotationDegrees != 0) {
-        val matrix = Matrix().apply { postRotate(rotationDegrees.toFloat()) }
-        Bitmap.createBitmap(rawBitmap, 0, 0, rawBitmap.width, rawBitmap.height, matrix, true)
-    } else {
-        rawBitmap
-    }
-
-    val crop = computeCropRegion(
-        sensorW = rotatedBitmap.width,
-        sensorH = rotatedBitmap.height,
-        previewW = previewWidthPx.toInt(),
-        previewH = previewHeightPx.toInt(),
-        guideLeft = guideLeft,
-        guideTop = guideTop,
-        guideSize = guideSize
-    )
-
-    val croppedBitmap = Bitmap.createBitmap(
-        rotatedBitmap, crop.x, crop.y, crop.size, crop.size
-    )
-
-    return Bitmap.createScaledBitmap(croppedBitmap, ImageSpec.SIZE_PX, ImageSpec.SIZE_PX, true)
-}
-
-/**
- * Converts a gallery-picked image into the final 1024x1024 image:
- * bounds-only decode -> compute inSampleSize -> downsampled decode ->
- * rotate to match EXIF orientation -> center-crop to a square (no guide
- * overlay exists for a picked photo, unlike the camera path) -> downscale
- * to 1024x1024.
- *
- * Returns null if the URI can't be opened or decoded, if decoding throws
- * (a missing/revoked URI grant, corrupt image or EXIF data, or an
- * OutOfMemoryError on an extreme-aspect source the sample-size heuristic
- * below can't shrink), or if the source is too small to fill the output
- * size without upscaling past what the grading model should trust.
- */
-private fun processPickedImage(context: Context, uri: Uri): Bitmap? {
-    return try {
-        val boundsStream = context.contentResolver.openInputStream(uri) ?: return null
-        val boundsOptions = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        boundsStream.use { BitmapFactory.decodeStream(it, null, boundsOptions) }
-
-        val decodeOptions = BitmapFactory.Options().apply {
-            inSampleSize = calculateInSampleSize(boundsOptions.outWidth, boundsOptions.outHeight, ImageSpec.SIZE_PX)
-        }
-        val decodeStream = context.contentResolver.openInputStream(uri) ?: return null
-        val rawBitmap = decodeStream.use { BitmapFactory.decodeStream(it, null, decodeOptions) }
-            ?: return null
-
-        val exifStream = context.contentResolver.openInputStream(uri) ?: return null
-        val orientation = exifStream.use {
-            ExifInterface(it).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
-        }
-        val rotationDegrees = when (orientation) {
-            ExifInterface.ORIENTATION_ROTATE_90 -> 90
-            ExifInterface.ORIENTATION_ROTATE_180 -> 180
-            ExifInterface.ORIENTATION_ROTATE_270 -> 270
-            // ponytail: rotation only, not flip/mirror — add if real photos need it
-            else -> 0
-        }
-        val rotatedBitmap = if (rotationDegrees != 0) {
-            val matrix = Matrix().apply { postRotate(rotationDegrees.toFloat()) }
-            Bitmap.createBitmap(rawBitmap, 0, 0, rawBitmap.width, rawBitmap.height, matrix, true)
-        } else {
-            rawBitmap
-        }
-
-        val crop = computeCenterSquareCrop(width = rotatedBitmap.width, height = rotatedBitmap.height)
-        // A source smaller than the output would get silently upscaled into a
-        // well-formed-looking 1024x1024 image carrying far less real detail --
-        // reject it instead of feeding the grading model false confidence. The
-        // caller (the gallery launcher's callback) shows a Toast when this
-        // returns null, covering both this case and any other decode failure.
-        if (crop.size < ImageSpec.SIZE_PX) return null
-
-        val croppedBitmap = Bitmap.createBitmap(rotatedBitmap, crop.x, crop.y, crop.size, crop.size)
-        Bitmap.createScaledBitmap(croppedBitmap, ImageSpec.SIZE_PX, ImageSpec.SIZE_PX, true)
-    } catch (e: Exception) {
-        android.util.Log.w("CameraPreviewScreen", "Gallery image processing failed", e)
-        null
-    } catch (e: OutOfMemoryError) {
-        android.util.Log.w("CameraPreviewScreen", "Gallery image processing ran out of memory", e)
-        null
     }
 }
 
