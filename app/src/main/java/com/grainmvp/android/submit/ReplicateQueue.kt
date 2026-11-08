@@ -6,6 +6,7 @@ import com.grainmvp.android.network.ReplicateResponse
 import com.grainmvp.android.network.RetrofitClient
 import com.grainmvp.android.network.toImagePart
 import com.grainmvp.android.network.toTextPart
+import com.grainmvp.android.session.SessionInfo
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
@@ -22,8 +23,7 @@ import kotlinx.serialization.json.Json
  */
 data class QueuedReplicate(
     val image: Bitmap,
-    val technicianName: String,
-    val sampleId: String,
+    val session: SessionInfo,
     val aiPredictedGrains: List<GrainBox>,
     val confirmedGrains: List<GrainBox>,
     val weight: String
@@ -38,8 +38,8 @@ data class QueuedReplicate(
 suspend fun submitQueuedReplicate(item: QueuedReplicate): ReplicateResponse {
     return RetrofitClient.apiService.submitReplicate(
         image = item.image.toImagePart(),
-        technicianName = item.technicianName.toTextPart(),
-        sampleId = item.sampleId.toTextPart(),
+        technicianName = item.session.technicianName.toTextPart(),
+        sampleId = item.session.sampleId.toTextPart(),
         aiPredictedGrains = Json.encodeToString(item.aiPredictedGrains).toTextPart(),
         confirmedGrains = Json.encodeToString(item.confirmedGrains).toTextPart(),
         weight = item.weight.toTextPart()

@@ -26,6 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.grainmvp.android.R
+import com.grainmvp.android.session.SessionInfo
 import com.grainmvp.android.ui.components.BlueprintFrame
 import com.grainmvp.android.ui.components.PrimaryActionButton
 import com.grainmvp.android.ui.components.SecondaryActionButton
@@ -57,7 +58,7 @@ fun StartSessionScreen(
     defaultTechnicianName: String,
     queuedCount: Int,
     onSendQueued: () -> Unit,
-    onStartScan: (technicianName: String, sampleId: String) -> Unit
+    onStartScan: (session: SessionInfo) -> Unit
 ) {
     var technicianName by remember { mutableStateOf(defaultTechnicianName) }
     var sampleId by remember { mutableStateOf("") }
@@ -142,7 +143,7 @@ fun StartSessionScreen(
         PrimaryActionButton(
             text = "Start scan",
             enabled = technicianName.isNotBlank() && sampleId.isNotBlank(),
-            onClick = { onStartScan(technicianName.trim(), sampleId.trim()) },
+            onClick = { onStartScan(SessionInfo(technicianName.trim(), sampleId.trim())) },
             modifier = Modifier.fillMaxWidth()
         )
 
