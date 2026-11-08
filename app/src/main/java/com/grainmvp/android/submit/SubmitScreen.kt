@@ -28,6 +28,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.grainmvp.android.ImageSpec
 import com.grainmvp.android.network.GrainBox
 import com.grainmvp.android.network.ReplicateResponse
 import com.grainmvp.android.session.incrementSampleId
@@ -206,7 +207,7 @@ private fun SubmitFormScreen(
             modifier = Modifier.fillMaxWidth()
         )
         Text(
-            "Sends the 1024 px image, both grain lists and the weight.",
+            "Sends the ${ImageSpec.SIZE_PX} px image, both grain lists and the weight.",
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 12.dp),
