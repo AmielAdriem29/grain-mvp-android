@@ -25,10 +25,9 @@ fun findTappedBoxIndex(grains: List<GrainBox>, imageX: Float, imageY: Float): In
  * Toggles a box between "removed" and its prior state, per SPEC.md's
  * "toggle its action (null/kept <-> removed)".
  *
- * Documented deviation: a box that started as "added" and is toggled to
- * "removed" then tapped again resets to null, not back to "added" --
- * the spec's rule doesn't cover re-toggling a user-added box, and this
- * is a rare, minor edge case. See IMPLEMENTATION.md.
+ * Only meant for boxes the AI predicted. A user-added box is never
+ * toggled: [applyGrainTap] deletes it outright instead, so "removed"
+ * always means "the AI predicted this and the technician rejected it".
  */
 fun toggleGrainBoxAction(box: GrainBox): GrainBox {
     return if (box.action == "removed") {
@@ -101,8 +100,9 @@ enum class GrainCorrectionMode { REMOVE, ADD }
 /**
  * Applies a tap at (imageX, imageY) to [grains] given the current
  * [mode]:
- *  - REMOVE mode: tapping an existing box toggles it kept/removed (via
- *    [toggleGrainBoxAction]); tapping empty space does nothing.
+ *  - REMOVE mode: tapping an AI box toggles it kept/removed (via
+ *    [toggleGrainBoxAction]); tapping a box the technician added deletes
+ *    it from the list; tapping empty space does nothing.
  *  - ADD mode: tapping empty space adds a new 24x24 box (via
  *    [createAddedGrainBox]); tapping an existing box does nothing.
  *
@@ -126,7 +126,11 @@ fun applyGrainTap(
                 grains
             } else {
                 grains.toMutableList().also {
-                    it[tappedIndex] = toggleGrainBoxAction(it[tappedIndex])
+                    if (it[tappedIndex].action == "added") {
+                        it.removeAt(tappedIndex)
+                    } else {
+                        it[tappedIndex] = toggleGrainBoxAction(it[tappedIndex])
+                    }
                 }
             }
         }

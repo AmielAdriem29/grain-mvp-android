@@ -210,6 +210,33 @@ class CorrectionLogicTest {
     }
 
     @Test
+    fun `remove mode tapping a user-added box deletes it from the list`() {
+        val grains = listOf(
+            GrainBox(x = 10, y = 10, width = 24, height = 24, confidence = 0.9f, action = null),
+            GrainBox(x = 100, y = 100, width = 24, height = 24, confidence = null, action = "added")
+        )
+
+        val result = applyGrainTap(grains, 105f, 105f, GrainCorrectionMode.REMOVE)
+
+        assertEquals(1, result.size)
+        assertEquals(10, result[0].x)
+    }
+
+    @Test
+    fun `add then remove then add again leaves exactly one added box`() {
+        val ai = listOf(GrainBox(x = 10, y = 10, width = 24, height = 24, confidence = 0.9f, action = null))
+
+        val added = applyGrainTap(ai, 300f, 300f, GrainCorrectionMode.ADD)
+        val removed = applyGrainTap(added, 305f, 305f, GrainCorrectionMode.REMOVE)
+        val addedAgain = applyGrainTap(removed, 300f, 300f, GrainCorrectionMode.ADD)
+
+        assertEquals(1, removed.size)
+        assertEquals(2, addedAgain.size)
+        assertEquals(1, addedAgain.count { it.action == "added" })
+        assertEquals(0, addedAgain.count { it.action == "removed" })
+    }
+
+    @Test
     fun `remove mode tapping empty space does nothing`() {
         val grains = listOf(
             GrainBox(x = 100, y = 100, width = 24, height = 24, confidence = 0.8f, action = null)
