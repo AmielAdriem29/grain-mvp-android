@@ -1,5 +1,6 @@
 package com.grainmvp.android.correction
 
+import com.grainmvp.android.network.GrainAction
 import com.grainmvp.android.network.GrainBox
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -71,12 +72,12 @@ class CorrectionLogicTest {
 
         val result = toggleGrainBoxAction(box)
 
-        assertEquals("removed", result.action)
+        assertEquals(GrainAction.REMOVED, result.action)
     }
 
     @Test
     fun `toggling a removed box resets its action to null`() {
-        val box = GrainBox(x = 0, y = 0, width = 24, height = 24, confidence = 0.9f, action = "removed")
+        val box = GrainBox(x = 0, y = 0, width = 24, height = 24, confidence = 0.9f, action = GrainAction.REMOVED)
 
         val result = toggleGrainBoxAction(box)
 
@@ -104,7 +105,7 @@ class CorrectionLogicTest {
 
         assertEquals(24, result.width)
         assertEquals(24, result.height)
-        assertEquals("added", result.action)
+        assertEquals(GrainAction.ADDED, result.action)
         assertNull(result.confidence)
     }
 
@@ -124,15 +125,15 @@ class CorrectionLogicTest {
     fun `untouched boxes convert to kept, others pass through unchanged`() {
         val grains = listOf(
             GrainBox(x = 0, y = 0, width = 24, height = 24, confidence = 0.9f, action = null),
-            GrainBox(x = 10, y = 10, width = 24, height = 24, confidence = 0.5f, action = "removed"),
-            GrainBox(x = 20, y = 20, width = 24, height = 24, confidence = null, action = "added")
+            GrainBox(x = 10, y = 10, width = 24, height = 24, confidence = 0.5f, action = GrainAction.REMOVED),
+            GrainBox(x = 20, y = 20, width = 24, height = 24, confidence = null, action = GrainAction.ADDED)
         )
 
         val result = prepareGrainsForSubmission(grains)
 
-        assertEquals("kept", result[0].action)
-        assertEquals("removed", result[1].action)
-        assertEquals("added", result[2].action)
+        assertEquals(GrainAction.KEPT, result[0].action)
+        assertEquals(GrainAction.REMOVED, result[1].action)
+        assertEquals(GrainAction.ADDED, result[2].action)
     }
 
     @Test
@@ -195,13 +196,13 @@ class CorrectionLogicTest {
 
         val result = applyGrainTap(grains, imageX = 110f, imageY = 110f, mode = GrainCorrectionMode.REMOVE)
 
-        assertEquals("removed", result[0].action)
+        assertEquals(GrainAction.REMOVED, result[0].action)
     }
 
     @Test
     fun `remove mode tapping an already-removed box un-removes it`() {
         val grains = listOf(
-            GrainBox(x = 100, y = 100, width = 24, height = 24, confidence = 0.8f, action = "removed")
+            GrainBox(x = 100, y = 100, width = 24, height = 24, confidence = 0.8f, action = GrainAction.REMOVED)
         )
 
         val result = applyGrainTap(grains, imageX = 110f, imageY = 110f, mode = GrainCorrectionMode.REMOVE)
@@ -213,7 +214,7 @@ class CorrectionLogicTest {
     fun `remove mode tapping a user-added box deletes it from the list`() {
         val grains = listOf(
             GrainBox(x = 10, y = 10, width = 24, height = 24, confidence = 0.9f, action = null),
-            GrainBox(x = 100, y = 100, width = 24, height = 24, confidence = null, action = "added")
+            GrainBox(x = 100, y = 100, width = 24, height = 24, confidence = null, action = GrainAction.ADDED)
         )
 
         val result = applyGrainTap(grains, 105f, 105f, GrainCorrectionMode.REMOVE)
@@ -232,8 +233,8 @@ class CorrectionLogicTest {
 
         assertEquals(1, removed.size)
         assertEquals(2, addedAgain.size)
-        assertEquals(1, addedAgain.count { it.action == "added" })
-        assertEquals(0, addedAgain.count { it.action == "removed" })
+        assertEquals(1, addedAgain.count { it.action == GrainAction.ADDED })
+        assertEquals(0, addedAgain.count { it.action == GrainAction.REMOVED })
     }
 
     @Test
@@ -256,7 +257,7 @@ class CorrectionLogicTest {
         val result = applyGrainTap(grains, imageX = 500f, imageY = 500f, mode = GrainCorrectionMode.ADD)
 
         assertEquals(2, result.size)
-        assertEquals("added", result[1].action)
+        assertEquals(GrainAction.ADDED, result[1].action)
         assertEquals(500, result[1].x)
         assertEquals(500, result[1].y)
     }

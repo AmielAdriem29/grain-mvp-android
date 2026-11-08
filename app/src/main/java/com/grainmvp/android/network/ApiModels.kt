@@ -1,11 +1,26 @@
 package com.grainmvp.android.network
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+
+/**
+ * What the technician did to a grain box during correction.
+ *
+ * Serialized as the lowercase strings the backend and dashboard expect:
+ * "kept", "removed", "added". A box nobody has touched yet has a null
+ * action.
+ */
+@Serializable
+enum class GrainAction {
+    @SerialName("kept") KEPT,
+    @SerialName("removed") REMOVED,
+    @SerialName("added") ADDED
+}
 
 /**
  * Field names must match the backend/dashboard exactly:
  * x, y, width, height, confidence, action (lowercase, no underscores).
- * action is one of "kept" | "removed" | "added" | null.
+ * action is a [GrainAction] or null.
  *
  * This same shape is used in three places with different meanings:
  *  - as returned by /api/predict (action always null, fresh AI boxes)
@@ -21,7 +36,7 @@ data class GrainBox(
     val width: Int,
     val height: Int,
     val confidence: Float? = null,
-    val action: String? = null
+    val action: GrainAction? = null
 )
 
 /** Response shape from POST /api/predict. */

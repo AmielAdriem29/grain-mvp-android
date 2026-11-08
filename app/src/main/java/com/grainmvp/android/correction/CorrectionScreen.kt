@@ -53,6 +53,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.grainmvp.android.ImageSpec
+import com.grainmvp.android.network.GrainAction
 import com.grainmvp.android.network.GrainBox
 import com.grainmvp.android.ui.components.SecondaryActionButton
 import com.grainmvp.android.ui.components.PrimaryActionButton
@@ -121,9 +122,9 @@ fun CorrectionScreen(
     var panOffset by remember(initialGrains) { mutableStateOf(Offset.Zero) }
 
     val aiCount = initialGrains.size
-    val removedCount = grains.count { it.action == "removed" }
-    val addedCount = grains.count { it.action == "added" }
-    val confirmedCount = grains.count { it.action != "removed" }
+    val removedCount = grains.count { it.action == GrainAction.REMOVED }
+    val addedCount = grains.count { it.action == GrainAction.ADDED }
+    val confirmedCount = grains.count { it.action != GrainAction.REMOVED }
 
     fun applyTap(imageX: Float, imageY: Float) {
         val updated = applyGrainTap(grains, imageX, imageY, mode)
@@ -279,7 +280,7 @@ fun CorrectionScreen(
                             val topLeft = Offset(box.x * displayScale, box.y * displayScale)
                             val boxSize = Size(box.width * displayScale, box.height * displayScale)
                             when (box.action) {
-                                "removed" -> drawRect(
+                                GrainAction.REMOVED -> drawRect(
                                     color = Color.White.copy(alpha = 0.85f),
                                     topLeft = topLeft,
                                     size = boxSize,
@@ -288,7 +289,7 @@ fun CorrectionScreen(
                                         pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 4f), 0f)
                                     )
                                 )
-                                "added" -> {
+                                GrainAction.ADDED -> {
                                     // Accent900 is a very dark green -- easy
                                     // to lose against a dark patch of the
                                     // photo without some halo. Removing it
