@@ -6,9 +6,6 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -27,19 +24,14 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.grainmvp.android.camera.CameraPreviewScreen
 import com.grainmvp.android.correction.CorrectionScreen
 import com.grainmvp.android.detect.DetectScreen
 import com.grainmvp.android.home.StartSessionScreen
 import com.grainmvp.android.home.WelcomeScreen
 import com.grainmvp.android.network.GrainBox
-import com.grainmvp.android.network.NetworkTestScreen
 import com.grainmvp.android.network.SupabaseAuth
 import com.grainmvp.android.session.incrementSampleId
 import com.grainmvp.android.submit.QueuedReplicate
@@ -177,49 +169,16 @@ fun GrainMvpApp() {
                 }
 
                 is Screen.Capture -> {
-                    // Hidden by default (showNetworkTestButton = false) so the button is hidden
-                    // from the UI while keeping the NetworkTestScreen feature preserved.
-                    val showNetworkTestButton = false
-                    var showNetworkTest by remember { mutableStateOf(false) }
-
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        if (showNetworkTest) {
-                            NetworkTestScreen()
-                        } else {
-                            CameraPreviewScreen(
+                    CameraPreviewScreen(
+                        sampleId = currentScreen.sampleId,
+                        onImageConfirmed = { bitmap ->
+                            screen = Screen.Detecting(
+                                image = bitmap,
                                 technicianName = currentScreen.technicianName,
-                                sampleId = currentScreen.sampleId,
-                                onImageConfirmed = { bitmap ->
-                                    screen = Screen.Detecting(
-                                        image = bitmap,
-                                        technicianName = currentScreen.technicianName,
-                                        sampleId = currentScreen.sampleId
-                                    )
-                                }
+                                sampleId = currentScreen.sampleId
                             )
                         }
-
-                        if (showNetworkTestButton) {
-                            Box(
-                                modifier = Modifier
-                                    .align(Alignment.TopEnd)
-                                    .padding(8.dp)
-                                    .background(Color.Black.copy(alpha = 0.72f))
-                                    .border(1.dp, Color.White.copy(alpha = 0.35f))
-                                    .clickable { showNetworkTest = !showNetworkTest }
-                                    .padding(horizontal = 12.dp, vertical = 8.dp)
-                            ) {
-                                Text(
-                                    if (showNetworkTest) "CAMERA" else "NETWORK TEST",
-                                    color = Color.White,
-                                    fontFamily = FontFamily.SansSerif,
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontSize = 12.sp,
-                                    letterSpacing = 0.8.sp
-                                )
-                            }
-                        }
-                    }
+                    )
                 }
 
                 is Screen.Detecting -> {

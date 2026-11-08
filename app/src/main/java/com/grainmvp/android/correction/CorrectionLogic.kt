@@ -62,17 +62,7 @@ fun createAddedGrainBox(imageX: Float, imageY: Float): GrainBox {
 fun prepareGrainsForSubmission(grains: List<GrainBox>): List<GrainBox> {
     return grains.map { if (it.action == null) it.copy(action = "kept") else it }
 }
-/**
- * Whether [value] is a valid partial or complete weight entry: empty,
- * digits, and at most one decimal point. No negative sign (a negative
- * weight is never valid), no letters, no multiple decimal points.
- *
- * KeyboardType.Decimal on the TextField only *suggests* a numeric
- * on-screen keyboard -- it does not block other input (switching to a
- * full keyboard, pasting text, a physical keyboard). This function is
- * the actual gate: call it in onValueChange and only accept the new
- * value if this returns true.
- */
+
 /**
  * Whether [value] is a complete, valid weight to submit: parses as a
  * number and is greater than zero. A negative or zero weight, empty
