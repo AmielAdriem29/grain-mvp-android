@@ -1,5 +1,6 @@
 package com.grainmvp.android.correction
 
+import com.grainmvp.android.network.GrainAction
 import com.grainmvp.android.network.GrainBox
 
 /**
@@ -30,10 +31,10 @@ fun findTappedBoxIndex(grains: List<GrainBox>, imageX: Float, imageY: Float): In
  * always means "the AI predicted this and the technician rejected it".
  */
 fun toggleGrainBoxAction(box: GrainBox): GrainBox {
-    return if (box.action == "removed") {
+    return if (box.action == GrainAction.REMOVED) {
         box.copy(action = null)
     } else {
-        box.copy(action = "removed")
+        box.copy(action = GrainAction.REMOVED)
     }
 }
 
@@ -49,7 +50,7 @@ fun createAddedGrainBox(imageX: Float, imageY: Float): GrainBox {
         width = NEW_BOX_SIZE,
         height = NEW_BOX_SIZE,
         confidence = null,
-        action = "added"
+        action = GrainAction.ADDED
     )
 }
 
@@ -60,7 +61,7 @@ fun createAddedGrainBox(imageX: Float, imageY: Float): GrainBox {
  * any other action (removed, added) pass through unchanged.
  */
 fun prepareGrainsForSubmission(grains: List<GrainBox>): List<GrainBox> {
-    return grains.map { if (it.action == null) it.copy(action = "kept") else it }
+    return grains.map { if (it.action == null) it.copy(action = GrainAction.KEPT) else it }
 }
 
 /**
@@ -116,7 +117,7 @@ fun applyGrainTap(
                 grains
             } else {
                 grains.toMutableList().also {
-                    if (it[tappedIndex].action == "added") {
+                    if (it[tappedIndex].action == GrainAction.ADDED) {
                         it.removeAt(tappedIndex)
                     } else {
                         it[tappedIndex] = toggleGrainBoxAction(it[tappedIndex])
