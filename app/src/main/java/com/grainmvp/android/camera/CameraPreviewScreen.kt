@@ -100,7 +100,6 @@ private val CaptureAccentGreen = AccentGreen
  */
 @Composable
 fun CameraPreviewScreen(
-    technicianName: String,
     sampleId: String,
     onImageConfirmed: (Bitmap) -> Unit
 ) {
