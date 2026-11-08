@@ -1,6 +1,7 @@
 package com.grainmvp.android.camera
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.net.Uri
@@ -204,6 +205,10 @@ private fun PermissionRequestScreen(onRequestPermission: () -> Unit, onPickFromG
  * session-context pill + torch toggle at the top, an instruction line,
  * and a three-cell bottom row (grid toggle / shutter / gallery).
  */
+// False positive: the BoxWithConstraints scope is used (maxWidth and
+// maxHeight size the guide), but the IDE check misses uses inside
+// with(density). Same suppression as CorrectionScreen.
+@SuppressLint("UnusedBoxWithConstraintsScope")
 @Composable
 private fun CaptureScreen(sampleId: String, onCaptured: (Bitmap) -> Unit, onPickFromGallery: () -> Unit) {
     val context = LocalContext.current
