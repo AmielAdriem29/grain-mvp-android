@@ -52,6 +52,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.grainmvp.android.ImageSpec
 import com.grainmvp.android.network.GrainBox
 import com.grainmvp.android.ui.components.SecondaryActionButton
 import com.grainmvp.android.ui.components.PrimaryActionButton
@@ -65,8 +66,6 @@ import com.grainmvp.android.ui.theme.Neutral500
 import com.grainmvp.android.ui.theme.Neutral700
 import com.grainmvp.android.ui.theme.SurfaceBg
 import com.grainmvp.android.ui.theme.TextPrimaryGranular
-
-private const val IMAGE_SIZE = 1024
 
 /** Zoom range: 1x (fit-to-width, no zoom) up to 4x -- close enough to make
  *  individual grains easy to tap without losing track of where you are
@@ -189,7 +188,7 @@ fun CorrectionScreen(
                 // rather than blending into the page background.
                 .blueprintCorners(Accent700)
         ) {
-            val displayScale = constraints.maxWidth.toFloat() / IMAGE_SIZE
+            val displayScale = constraints.maxWidth.toFloat() / ImageSpec.SIZE_PX
             val boxSizePx = constraints.maxWidth.toFloat()
 
             Box(

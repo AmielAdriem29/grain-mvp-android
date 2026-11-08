@@ -11,11 +11,13 @@ import retrofit2.Retrofit
 import java.util.concurrent.TimeUnit
 
 /**
- * Single shared Retrofit instance. BuildConfig.BACKEND_BASE_URL and
- * BACKEND_API_KEY come from local.properties (see app/build.gradle.kts) —
- * never hardcoded here.
+ * Single shared Retrofit instance. BuildConfig.BACKEND_BASE_URL comes
+ * from local.properties (see app/build.gradle.kts), never hardcoded here.
  */
 object RetrofitClient {
+
+    /** Timeout applied to connect, read and write. */
+    private const val HTTP_TIMEOUT_SECONDS = 50L
 
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -39,10 +41,9 @@ object RetrofitClient {
                     }
                 },
             )
-            // Spec: "Set a 30-second timeout on the HTTP client."
-            .connectTimeout(50, TimeUnit.SECONDS)
-            .readTimeout(50, TimeUnit.SECONDS)
-            .writeTimeout(50, TimeUnit.SECONDS)
+            .connectTimeout(HTTP_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .readTimeout(HTTP_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .writeTimeout(HTTP_TIMEOUT_SECONDS, TimeUnit.SECONDS)
             .build()
     }
 

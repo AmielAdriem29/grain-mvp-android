@@ -60,6 +60,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import com.grainmvp.android.ImageSpec
 import com.grainmvp.android.ui.components.PrimaryActionButton
 import com.grainmvp.android.ui.components.SecondaryActionButton
 import com.grainmvp.android.ui.theme.AccentGreen
@@ -71,13 +72,6 @@ import com.grainmvp.android.ui.theme.Accent700
 import com.grainmvp.android.ui.theme.SurfaceBg
 import com.grainmvp.android.ui.theme.TextPrimaryGranular
 import kotlin.math.min
-
-/**
- * Fixed 1024x1024 — the single coordinate space every GrainBox in this
- * whole system assumes. Do not change this without updating the
- * backend/dashboard, which both assume it too.
- */
-private const val OUTPUT_SIZE = 1024
 
 /**
  * The capture chrome's guide brackets and small icon glyphs (screen 03
@@ -131,7 +125,7 @@ fun CameraPreviewScreen(
             } else {
                 android.widget.Toast.makeText(
                     context,
-                    "Couldn't use that photo — try one that's at least 1024x1024.",
+                    "Couldn't use that photo — try one that's at least ${ImageSpec.SIZE_PX}x${ImageSpec.SIZE_PX}.",
                     android.widget.Toast.LENGTH_LONG
                 ).show()
             }
@@ -521,7 +515,7 @@ private fun processCapturedImage(
         rotatedBitmap, crop.x, crop.y, crop.size, crop.size
     )
 
-    return Bitmap.createScaledBitmap(croppedBitmap, OUTPUT_SIZE, OUTPUT_SIZE, true)
+    return Bitmap.createScaledBitmap(croppedBitmap, ImageSpec.SIZE_PX, ImageSpec.SIZE_PX, true)
 }
 
 /**
@@ -544,7 +538,7 @@ private fun processPickedImage(context: Context, uri: Uri): Bitmap? {
         boundsStream.use { BitmapFactory.decodeStream(it, null, boundsOptions) }
 
         val decodeOptions = BitmapFactory.Options().apply {
-            inSampleSize = calculateInSampleSize(boundsOptions.outWidth, boundsOptions.outHeight, OUTPUT_SIZE)
+            inSampleSize = calculateInSampleSize(boundsOptions.outWidth, boundsOptions.outHeight, ImageSpec.SIZE_PX)
         }
         val decodeStream = context.contentResolver.openInputStream(uri) ?: return null
         val rawBitmap = decodeStream.use { BitmapFactory.decodeStream(it, null, decodeOptions) }
@@ -574,10 +568,10 @@ private fun processPickedImage(context: Context, uri: Uri): Bitmap? {
         // reject it instead of feeding the grading model false confidence. The
         // caller (the gallery launcher's callback) shows a Toast when this
         // returns null, covering both this case and any other decode failure.
-        if (crop.size < OUTPUT_SIZE) return null
+        if (crop.size < ImageSpec.SIZE_PX) return null
 
         val croppedBitmap = Bitmap.createBitmap(rotatedBitmap, crop.x, crop.y, crop.size, crop.size)
-        Bitmap.createScaledBitmap(croppedBitmap, OUTPUT_SIZE, OUTPUT_SIZE, true)
+        Bitmap.createScaledBitmap(croppedBitmap, ImageSpec.SIZE_PX, ImageSpec.SIZE_PX, true)
     } catch (e: Exception) {
         android.util.Log.w("CameraPreviewScreen", "Gallery image processing failed", e)
         null
@@ -609,7 +603,7 @@ private fun ReviewScreen(sampleId: String, image: Bitmap, onRetake: () -> Unit, 
                 fontSize = 22.sp,
                 color = TextPrimaryGranular
             )
-            Text("$sampleId · 1024 px", fontSize = 12.sp, color = Neutral600)
+            Text("$sampleId · ${ImageSpec.SIZE_PX} px", fontSize = 12.sp, color = Neutral600)
         }
 
         Box(
