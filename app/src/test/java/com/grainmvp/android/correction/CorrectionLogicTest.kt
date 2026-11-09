@@ -77,7 +77,14 @@ class CorrectionLogicTest {
 
     @Test
     fun `toggling a removed box resets its action to null`() {
-        val box = GrainBox(x = 0, y = 0, width = 24, height = 24, confidence = 0.9f, action = GrainAction.REMOVED)
+        val box = GrainBox(
+            x = 0,
+            y = 0,
+            width = 24,
+            height = 24,
+            confidence = 0.9f,
+            action = GrainAction.REMOVED
+        )
 
         val result = toggleGrainBoxAction(box)
 
@@ -86,7 +93,8 @@ class CorrectionLogicTest {
 
     @Test
     fun `toggling preserves every other field unchanged`() {
-        val box = GrainBox(x = 42, y = 99, width = 24, height = 24, confidence = 0.55f, action = null)
+        val box =
+            GrainBox(x = 42, y = 99, width = 24, height = 24, confidence = 0.55f, action = null)
 
         val result = toggleGrainBoxAction(box)
 
@@ -125,8 +133,22 @@ class CorrectionLogicTest {
     fun `untouched boxes convert to kept, others pass through unchanged`() {
         val grains = listOf(
             GrainBox(x = 0, y = 0, width = 24, height = 24, confidence = 0.9f, action = null),
-            GrainBox(x = 10, y = 10, width = 24, height = 24, confidence = 0.5f, action = GrainAction.REMOVED),
-            GrainBox(x = 20, y = 20, width = 24, height = 24, confidence = null, action = GrainAction.ADDED)
+            GrainBox(
+                x = 10,
+                y = 10,
+                width = 24,
+                height = 24,
+                confidence = 0.5f,
+                action = GrainAction.REMOVED
+            ),
+            GrainBox(
+                x = 20,
+                y = 20,
+                width = 24,
+                height = 24,
+                confidence = null,
+                action = GrainAction.ADDED
+            )
         )
 
         val result = prepareGrainsForSubmission(grains)
@@ -186,6 +208,33 @@ class CorrectionLogicTest {
         assertEquals(false, isValidWeightValue("   "))
     }
 
+    @Test
+    fun `weight just above zero is valid`() {
+        assertEquals(true, isValidWeightValue("0.01"))
+    }
+
+    @Test
+    fun `weight of exactly 30 g is valid`() {
+        assertEquals(true, isValidWeightValue("30"))
+        assertEquals(true, isValidWeightValue("30.0"))
+    }
+
+    @Test
+    fun `weight just above 30 g is invalid`() {
+        assertEquals(false, isValidWeightValue("30.01"))
+    }
+
+    @Test
+    fun `a very large weight is invalid`() {
+        assertEquals(false, isValidWeightValue("1000"))
+        assertEquals(false, isValidWeightValue("Infinity"))
+    }
+
+    @Test
+    fun `NaN is invalid`() {
+        assertEquals(false, isValidWeightValue("NaN"))
+    }
+
     // ---- applyGrainTap (screen 05's explicit Remove/Add mode) ----
 
     @Test
@@ -194,7 +243,8 @@ class CorrectionLogicTest {
             GrainBox(x = 100, y = 100, width = 24, height = 24, confidence = 0.8f, action = null)
         )
 
-        val result = applyGrainTap(grains, imageX = 110f, imageY = 110f, mode = GrainCorrectionMode.REMOVE)
+        val result =
+            applyGrainTap(grains, imageX = 110f, imageY = 110f, mode = GrainCorrectionMode.REMOVE)
 
         assertEquals(GrainAction.REMOVED, result[0].action)
     }
@@ -202,10 +252,18 @@ class CorrectionLogicTest {
     @Test
     fun `remove mode tapping an already-removed box un-removes it`() {
         val grains = listOf(
-            GrainBox(x = 100, y = 100, width = 24, height = 24, confidence = 0.8f, action = GrainAction.REMOVED)
+            GrainBox(
+                x = 100,
+                y = 100,
+                width = 24,
+                height = 24,
+                confidence = 0.8f,
+                action = GrainAction.REMOVED
+            )
         )
 
-        val result = applyGrainTap(grains, imageX = 110f, imageY = 110f, mode = GrainCorrectionMode.REMOVE)
+        val result =
+            applyGrainTap(grains, imageX = 110f, imageY = 110f, mode = GrainCorrectionMode.REMOVE)
 
         assertNull(result[0].action)
     }
@@ -214,7 +272,14 @@ class CorrectionLogicTest {
     fun `remove mode tapping a user-added box deletes it from the list`() {
         val grains = listOf(
             GrainBox(x = 10, y = 10, width = 24, height = 24, confidence = 0.9f, action = null),
-            GrainBox(x = 100, y = 100, width = 24, height = 24, confidence = null, action = GrainAction.ADDED)
+            GrainBox(
+                x = 100,
+                y = 100,
+                width = 24,
+                height = 24,
+                confidence = null,
+                action = GrainAction.ADDED
+            )
         )
 
         val result = applyGrainTap(grains, 105f, 105f, GrainCorrectionMode.REMOVE)
@@ -225,7 +290,16 @@ class CorrectionLogicTest {
 
     @Test
     fun `add then remove then add again leaves exactly one added box`() {
-        val ai = listOf(GrainBox(x = 10, y = 10, width = 24, height = 24, confidence = 0.9f, action = null))
+        val ai = listOf(
+            GrainBox(
+                x = 10,
+                y = 10,
+                width = 24,
+                height = 24,
+                confidence = 0.9f,
+                action = null
+            )
+        )
 
         val added = applyGrainTap(ai, 300f, 300f, GrainCorrectionMode.ADD)
         val removed = applyGrainTap(added, 305f, 305f, GrainCorrectionMode.REMOVE)
@@ -243,7 +317,8 @@ class CorrectionLogicTest {
             GrainBox(x = 100, y = 100, width = 24, height = 24, confidence = 0.8f, action = null)
         )
 
-        val result = applyGrainTap(grains, imageX = 500f, imageY = 500f, mode = GrainCorrectionMode.REMOVE)
+        val result =
+            applyGrainTap(grains, imageX = 500f, imageY = 500f, mode = GrainCorrectionMode.REMOVE)
 
         assertEquals(grains, result)
     }
@@ -254,7 +329,8 @@ class CorrectionLogicTest {
             GrainBox(x = 100, y = 100, width = 24, height = 24, confidence = 0.8f, action = null)
         )
 
-        val result = applyGrainTap(grains, imageX = 500f, imageY = 500f, mode = GrainCorrectionMode.ADD)
+        val result =
+            applyGrainTap(grains, imageX = 500f, imageY = 500f, mode = GrainCorrectionMode.ADD)
 
         assertEquals(2, result.size)
         assertEquals(GrainAction.ADDED, result[1].action)
@@ -268,7 +344,8 @@ class CorrectionLogicTest {
             GrainBox(x = 100, y = 100, width = 24, height = 24, confidence = 0.8f, action = null)
         )
 
-        val result = applyGrainTap(grains, imageX = 110f, imageY = 110f, mode = GrainCorrectionMode.ADD)
+        val result =
+            applyGrainTap(grains, imageX = 110f, imageY = 110f, mode = GrainCorrectionMode.ADD)
 
         assertEquals(grains, result)
         assertEquals(1, result.size)

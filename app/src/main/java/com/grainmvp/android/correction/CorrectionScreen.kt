@@ -176,9 +176,21 @@ fun CorrectionScreen(
             }
             Column(horizontalAlignment = Alignment.End) {
                 Text("AI detected $aiCount", fontSize = 12.sp, color = Neutral700)
-                Text("You removed $removedCount · added $addedCount", fontSize = 12.sp, color = Neutral700)
+                Text(
+                    "You removed $removedCount · added $addedCount",
+                    fontSize = 12.sp,
+                    color = Neutral700
+                )
             }
         }
+
+        // SRS CH-04 / CH-09: the boxes are not what the grade is computed from.
+        Text(
+            "Boxes mark immature grains for the image record and training data. The grade comes from the weight.",
+            fontSize = 12.sp,
+            color = Neutral700,
+            modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 8.dp)
+        )
 
         BoxWithConstraints(
             modifier = Modifier
@@ -287,9 +299,13 @@ fun CorrectionScreen(
                                     size = boxSize,
                                     style = Stroke(
                                         width = 1.5.dp.toPx(),
-                                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 4f), 0f)
+                                        pathEffect = PathEffect.dashPathEffect(
+                                            floatArrayOf(6f, 4f),
+                                            0f
+                                        )
                                     )
                                 )
+
                                 GrainAction.ADDED -> {
                                     // Accent900 is a very dark green -- easy
                                     // to lose against a dark patch of the
@@ -303,7 +319,10 @@ fun CorrectionScreen(
                                     drawRect(
                                         color = Color.White.copy(alpha = 0.7f),
                                         topLeft = Offset(topLeft.x - halo, topLeft.y - halo),
-                                        size = Size(boxSize.width + halo * 2, boxSize.height + halo * 2),
+                                        size = Size(
+                                            boxSize.width + halo * 2,
+                                            boxSize.height + halo * 2
+                                        ),
                                         style = Stroke(width = 1.dp.toPx())
                                     )
                                     drawRect(
@@ -313,6 +332,7 @@ fun CorrectionScreen(
                                         style = Stroke(width = 1.5.dp.toPx())
                                     )
                                 }
+
                                 else -> drawRect(
                                     color = DetectionBlue,
                                     topLeft = topLeft,
@@ -333,7 +353,9 @@ fun CorrectionScreen(
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     FloatingZoomButton(symbol = "+", onClick = { stepZoom(ZOOM_STEP, boxSizePx) })
-                    FloatingZoomButton(symbol = "−", onClick = { stepZoom(1f / ZOOM_STEP, boxSizePx) })
+                    FloatingZoomButton(
+                        symbol = "−",
+                        onClick = { stepZoom(1f / ZOOM_STEP, boxSizePx) })
                 }
             }
         }
@@ -389,24 +411,32 @@ fun CorrectionScreen(
                 modifier = Modifier.weight(1f)
             )
 
-            OutlinedTextField(
-                value = weightText,
-                onValueChange = { weightText = it },
-                singleLine = true,
-                shape = RectangleShape,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                suffix = { Text("g", fontSize = 12.sp, color = Neutral700) },
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = AccentGreen,
-                    unfocusedBorderColor = DividerColor
-                ),
-                modifier = Modifier.width(150.dp)
-            )
+            Column(modifier = Modifier.width(170.dp)) {
+                Text(
+                    "Immature grain weight (g)",
+                    fontSize = 11.sp,
+                    color = Neutral700,
+                    modifier = Modifier.padding(bottom = 4.dp)
+                )
+                OutlinedTextField(
+                    value = weightText,
+                    onValueChange = { weightText = it },
+                    singleLine = true,
+                    shape = RectangleShape,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    suffix = { Text("g", fontSize = 12.sp, color = Neutral700) },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = AccentGreen,
+                        unfocusedBorderColor = DividerColor
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
         }
 
         if (weightText.isNotBlank() && !isValidWeightValue(weightText)) {
             Text(
-                "Enter a valid weight in grams (e.g. 12.45)",
+                "Enter a weight above 0 and up to ${MAX_WEIGHT_GRAMS.toInt()} g (e.g. 12.45)",
                 fontSize = 12.sp,
                 color = ErrorRed,
                 modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 6.dp)
@@ -453,13 +483,22 @@ private fun FloatingZoomButton(symbol: String, onClick: () -> Unit) {
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
-        Text(symbol, color = Color.White, fontSize = 15.sp, fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.SemiBold)
+        Text(
+            symbol,
+            color = Color.White,
+            fontSize = 15.sp,
+            fontFamily = FontFamily.SansSerif,
+            fontWeight = FontWeight.SemiBold
+        )
     }
 }
 
 @Composable
 private fun LegendEntry(label: String, swatch: @Composable () -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
         swatch()
         Text(label, fontSize = 12.sp, color = Neutral700)
     }
@@ -492,7 +531,12 @@ private fun ModeSegmentedControl(
 }
 
 @Composable
-private fun SegmentOption(text: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun SegmentOption(
+    text: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     Box(
         modifier = modifier
             .fillMaxSize()

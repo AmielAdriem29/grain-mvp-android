@@ -29,6 +29,12 @@ interface ApiService {
         @Part("sampleId") sampleId: RequestBody,
         @Part("aiPredictedGrains") aiPredictedGrains: RequestBody,
         @Part("confirmedGrains") confirmedGrains: RequestBody,
-        @Part("weight") weight: RequestBody
+        @Part("weight") weight: RequestBody,
+        @Part("season") season: RequestBody,
+        @Part("indexNumber") indexNumber: RequestBody,
+        @Part("selectionName") selectionName: RequestBody,
+        @Part("sampleNo") sampleNo: RequestBody,
+        @Part("capturedAt") capturedAt: RequestBody,
+        @Part("submittedAt") submittedAt: RequestBody
     ): ReplicateResponse
 }

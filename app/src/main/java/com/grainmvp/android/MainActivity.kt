@@ -36,22 +36,24 @@ import com.grainmvp.android.network.GrainBox
 import com.grainmvp.android.network.SupabaseAuth
 import com.grainmvp.android.session.SessionInfo
 import com.grainmvp.android.submit.QueuedReplicate
+import com.grainmvp.android.submit.isDuplicateSampleError
 import com.grainmvp.android.submit.SubmitScreen
 import com.grainmvp.android.submit.submitQueuedReplicate
 import com.grainmvp.android.ui.theme.GrainMvpTheme
 import kotlinx.coroutines.launch
+import java.time.Instant
 
 /**
  * Entry point. Screens are swapped in per phase branch; as of the
  * GRANULAR field redesign (2026-09), the flow is:
  *  - Welcome (opening splash)
- *  - Start Session (technician + sample ID -- collected once here, not
- *    on Submit anymore)
+ *  - Start Session (technician, season, index number, selection name and
+ *    sample ID -- collected here, not on Submit)
  *  - Capture -> Detect -> Correction -> Submit, all carrying the same
- *    [SessionInfo] (technician and sample ID)
- *  - Submit's Result screen's "Next sample" skips straight back to
- *    Capture with the same technician and an incremented sample ID,
- *    bypassing Start Session
+ *    [SessionInfo], plus the time the photo was captured
+ *  - Result's "Add second sample" goes straight back to Capture for
+ *    sample 2 of the same entry; "Next sample" returns to Start Session
+ *    with technician, season and the next sample ID prefilled
  *  - A submission that fails to send can be "kept on device" from the
  *    Failure screen -- held in `replicateQueue` (in-memory only) and
  *    retried manually from Start Session's "Send N queued" -- see
@@ -64,18 +66,23 @@ private sealed class Screen {
     data object Welcome : Screen()
     data object StartSession : Screen()
     data class Capture(val session: SessionInfo) : Screen()
-    data class Detecting(val image: Bitmap, val session: SessionInfo) : Screen()
+    data class Detecting(val image: Bitmap, val session: SessionInfo, val capturedAt: Instant) :
+        Screen()
+
     data class Correction(
         val image: Bitmap,
         val predictedGrains: List<GrainBox>,
-        val session: SessionInfo
+        val session: SessionInfo,
+        val capturedAt: Instant
     ) : Screen()
+
     data class Submit(
         val image: Bitmap,
         val aiPredictedGrains: List<GrainBox>,
         val confirmedGrains: List<GrainBox>,
         val weight: String,
-        val session: SessionInfo
+        val session: SessionInfo,
+        val capturedAt: Instant
     ) : Screen()
 }
 
@@ -121,6 +128,7 @@ fun GrainMvpApp() {
                             Text("Couldn't connect: ${state.message}")
                             Button(onClick = { authAttempt++ }) { Text("Retry") }
                         }
+
                         else -> CircularProgressIndicator()
                     }
                 }
@@ -135,6 +143,8 @@ fun GrainMvpApp() {
     // Start Session after ending a session pre-fills the last-used
     // technician name, per the redesign brief.
     var lastTechnicianName by remember { mutableStateOf("") }
+    var lastSeason by remember { mutableStateOf("") }
+    var lastSampleId by remember { mutableStateOf("") }
 
     // Submissions that failed to send and are being held for a later
     // manual retry ("Keep on device" on the Failure screen) -- see
@@ -156,12 +166,16 @@ fun GrainMvpApp() {
                 is Screen.StartSession -> {
                     StartSessionScreen(
                         defaultTechnicianName = lastTechnicianName,
+                        defaultSeason = lastSeason,
+                        defaultSampleId = lastSampleId,
                         queuedCount = replicateQueue.size,
                         onSendQueued = {
                             scope.launch { sendQueuedReplicates(context, replicateQueue) }
                         },
                         onStartScan = { session ->
                             lastTechnicianName = session.technicianName
+                            lastSeason = session.season
+                            lastSampleId = session.sampleId
                             screen = Screen.Capture(session)
                         }
                     )
@@ -170,8 +184,12 @@ fun GrainMvpApp() {
                 is Screen.Capture -> {
                     CameraPreviewScreen(
                         sampleId = currentScreen.session.sampleId,
-                        onImageConfirmed = { bitmap ->
-                            screen = Screen.Detecting(image = bitmap, session = currentScreen.session)
+                        onImageConfirmed = { bitmap, capturedAt ->
+                            screen = Screen.Detecting(
+                                image = bitmap,
+                                session = currentScreen.session,
+                                capturedAt = capturedAt
+                            )
                         }
                     )
                 }
@@ -184,7 +202,19 @@ fun GrainMvpApp() {
                             screen = Screen.Correction(
                                 image = currentScreen.image,
                                 predictedGrains = grains,
-                                session = currentScreen.session
+                                session = currentScreen.session,
+                                capturedAt = currentScreen.capturedAt
+                            )
+                        },
+                        onContinueWithoutProposals = {
+                            // REQ-102: detection failed, so the technician
+                            // adds every box by hand. The record is then
+                            // submitted with an empty aiPredictedGrains list.
+                            screen = Screen.Correction(
+                                image = currentScreen.image,
+                                predictedGrains = emptyList(),
+                                session = currentScreen.session,
+                                capturedAt = currentScreen.capturedAt
                             )
                         },
                         onRetake = {
@@ -209,7 +239,8 @@ fun GrainMvpApp() {
                                 aiPredictedGrains = currentScreen.predictedGrains,
                                 confirmedGrains = confirmedGrains,
                                 weight = weight,
-                                session = currentScreen.session
+                                session = currentScreen.session,
+                                capturedAt = currentScreen.capturedAt
                             )
                         }
                     )
@@ -222,21 +253,34 @@ fun GrainMvpApp() {
                         aiPredictedGrains = currentScreen.aiPredictedGrains,
                         confirmedGrains = currentScreen.confirmedGrains,
                         weight = currentScreen.weight,
-                        onEndSession = { screen = Screen.Welcome },
+                        capturedAt = currentScreen.capturedAt,
+                        onEndSession = {
+                            lastSampleId = ""
+                            screen = Screen.Welcome
+                        },
+                        onAddSecondSample = { secondSession ->
+                            // Same entry, sample 2: skip Start Session.
+                            screen = Screen.Capture(secondSession)
+                        },
                         onNextSample = { nextSession ->
+                            // New entry: back to Start Session with technician,
+                            // season and the next sample ID prefilled. The
+                            // index number is entered again.
                             lastTechnicianName = nextSession.technicianName
-                            screen = Screen.Capture(nextSession)
+                            lastSeason = nextSession.season
+                            lastSampleId = nextSession.sampleId
+                            screen = Screen.StartSession
                         },
                         onKeepOnDevice = { queuedItem ->
                             replicateQueue.add(queuedItem)
-                            lastTechnicianName = queuedItem.session.technicianName
                             // "...or keep scanning and send it later" (the
-                            // Failure screen's own copy) means continuing to
-                            // the next sample, not ending the session --
-                            // same shape as Result's "Next sample": same
-                            // technician, incremented ID, straight back to
-                            // Capture.
-                            screen = Screen.Capture(queuedItem.session.nextSample())
+                            // Failure screen's own copy) follows the same
+                            // path as "Next sample".
+                            val nextSession = queuedItem.session.nextSample()
+                            lastTechnicianName = nextSession.technicianName
+                            lastSeason = nextSession.season
+                            lastSampleId = nextSession.sampleId
+                            screen = Screen.StartSession
                         }
                     )
                 }
@@ -264,6 +308,14 @@ private suspend fun sendQueuedReplicates(context: Context, queue: MutableList<Qu
             queue.remove(item)
             sentCount++
         } catch (e: Exception) {
+            if (isDuplicateSampleError(e)) {
+                // 409: an earlier attempt for this season, index number and
+                // sample number was already saved (SDD 1.6). Nothing left
+                // to send, so drop it from the queue and count it as sent.
+                queue.remove(item)
+                sentCount++
+                continue
+            }
             // Leave it queued; the technician can tap "Send" again once
             // they actually have a connection.
             Log.w("MainActivity", "Queued sample ${item.session.sampleId} failed to send", e)

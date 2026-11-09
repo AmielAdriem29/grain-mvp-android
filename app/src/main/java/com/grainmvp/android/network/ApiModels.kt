@@ -12,9 +12,12 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 enum class GrainAction {
-    @SerialName("kept") KEPT,
-    @SerialName("removed") REMOVED,
-    @SerialName("added") ADDED
+    @SerialName("kept")
+    KEPT,
+    @SerialName("removed")
+    REMOVED,
+    @SerialName("added")
+    ADDED
 }
 
 /**
@@ -51,5 +54,7 @@ data class PredictResponse(
 data class ReplicateResponse(
     val id: String,
     val percentage: Double,
-    val grade: String
+    val grade: String,
+    // Optional so the app still works against a backend that does not send it yet.
+    val meetsRecommendedValue: Boolean? = null
 )

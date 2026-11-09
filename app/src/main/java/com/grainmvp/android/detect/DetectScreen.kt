@@ -54,6 +54,7 @@ fun DetectScreen(
     image: Bitmap,
     session: SessionInfo,
     onDetected: (List<GrainBox>) -> Unit,
+    onContinueWithoutProposals: () -> Unit,
     onRetake: () -> Unit
 ) {
     var attempt by remember { mutableStateOf(0) }
@@ -73,7 +74,9 @@ fun DetectScreen(
     val error = errorClassName
     if (error == null) {
         Box(
-            modifier = Modifier.fillMaxSize().background(SurfaceBg),
+            modifier = Modifier
+                .fillMaxSize()
+                .background(SurfaceBg),
             contentAlignment = Alignment.Center
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -132,7 +135,7 @@ fun DetectScreen(
                     color = Neutral900
                 )
                 Text(
-                    "Try again, or go back and retake the photo.",
+                    "Try again, retake the photo, or continue without proposals and add every box by hand.",
                     modifier = Modifier.padding(top = 6.dp),
                     fontSize = 13.sp,
                     color = Neutral700
@@ -154,9 +157,18 @@ fun DetectScreen(
                 modifier = Modifier.fillMaxWidth()
             )
             SecondaryActionButton(
+                text = "Continue without proposals",
+                onClick = onContinueWithoutProposals,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 10.dp)
+            )
+            SecondaryActionButton(
                 text = "Retake photo",
                 onClick = onRetake,
-                modifier = Modifier.fillMaxWidth().padding(top = 10.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 10.dp)
             )
         }
     }

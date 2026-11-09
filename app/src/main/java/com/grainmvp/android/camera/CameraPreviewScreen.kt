@@ -73,6 +73,7 @@ import com.grainmvp.android.ui.theme.Neutral800
 import com.grainmvp.android.ui.theme.Accent700
 import com.grainmvp.android.ui.theme.SurfaceBg
 import com.grainmvp.android.ui.theme.TextPrimaryGranular
+import java.time.Instant
 import kotlin.math.min
 
 /**
@@ -97,7 +98,7 @@ private val CaptureAccentGreen = AccentGreen
 @Composable
 fun CameraPreviewScreen(
     sampleId: String,
-    onImageConfirmed: (Bitmap) -> Unit
+    onImageConfirmed: (image: Bitmap, capturedAt: Instant) -> Unit
 ) {
     val context = LocalContext.current
     var hasCameraPermission by remember {
@@ -112,6 +113,8 @@ fun CameraPreviewScreen(
     ) { granted -> hasCameraPermission = granted }
 
     var capturedImage by remember { mutableStateOf<Bitmap?>(null) }
+    // When the current photo was taken (camera shutter) or accepted (gallery).
+    var capturedAt by remember { mutableStateOf<Instant?>(null) }
 
     // Gallery picking needs no runtime permission, so its launcher lives
     // here rather than inside CaptureScreen -- that lets both the
@@ -123,6 +126,7 @@ fun CameraPreviewScreen(
         if (uri != null) {
             val bitmap = processPickedImage(context, uri)
             if (bitmap != null) {
+                capturedAt = Instant.now()
                 capturedImage = bitmap
             } else {
                 Toast.makeText(
@@ -146,8 +150,11 @@ fun CameraPreviewScreen(
         ReviewScreen(
             sampleId = sampleId,
             image = currentImage,
-            onRetake = { capturedImage = null },
-            onContinue = { onImageConfirmed(currentImage) }
+            onRetake = {
+                capturedImage = null
+                capturedAt = null
+            },
+            onContinue = { onImageConfirmed(currentImage, capturedAt ?: Instant.now()) }
         )
         return
     }
@@ -164,7 +171,10 @@ fun CameraPreviewScreen(
 
     CaptureScreen(
         sampleId = sampleId,
-        onCaptured = { bitmap -> capturedImage = bitmap },
+        onCaptured = { bitmap ->
+            capturedAt = Instant.now()
+            capturedImage = bitmap
+        },
         onPickFromGallery = onPickFromGallery
     )
 }
