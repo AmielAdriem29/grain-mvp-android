@@ -8,6 +8,9 @@ import com.grainmvp.android.network.GrainBox
  */
 const val NEW_BOX_SIZE = 24
 
+/** Largest immature-grain weight accepted, in grams (REQ-305). The backend enforces the same limit. */
+const val MAX_WEIGHT_GRAMS = 30.0
+
 /**
  * Finds the index of the first GrainBox in [grains] that contains the
  * point (imageX, imageY), or -1 if no box contains it.
@@ -66,9 +69,10 @@ fun prepareGrainsForSubmission(grains: List<GrainBox>): List<GrainBox> {
 
 /**
  * Whether [value] is a complete, valid weight to submit: parses as a
- * number and is greater than zero. A negative or zero weight, empty
- * input, or anything non-numeric (letters, multiple decimal points,
- * stray whitespace) is invalid.
+ * number, is greater than zero and at most [MAX_WEIGHT_GRAMS]. A
+ * negative, zero or over-limit weight, empty input, or anything
+ * non-numeric (letters, multiple decimal points, stray whitespace) is
+ * invalid.
  *
  * Deliberately does NOT block keystrokes while typing -- rejecting
  * characters silently as the user types (e.g. via onValueChange) reads
@@ -78,7 +82,7 @@ fun prepareGrainsForSubmission(grains: List<GrainBox>): List<GrainBox> {
  */
 fun isValidWeightValue(value: String): Boolean {
     val parsed = value.toDoubleOrNull() ?: return false
-    return parsed > 0
+    return parsed > 0 && parsed <= MAX_WEIGHT_GRAMS
 }
 
 /**
@@ -125,6 +129,7 @@ fun applyGrainTap(
                 }
             }
         }
+
         GrainCorrectionMode.ADD -> {
             if (tappedIndex >= 0) {
                 grains
