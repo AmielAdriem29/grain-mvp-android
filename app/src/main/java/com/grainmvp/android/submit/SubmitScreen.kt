@@ -79,14 +79,13 @@ fun SubmitScreen(
 ) {
     var state by remember { mutableStateOf<SubmitState>(SubmitState.Form) }
     val scope = rememberCoroutineScope()
+    val queuedItem = QueuedReplicate(image, session, aiPredictedGrains, confirmedGrains, weight)
 
     fun submit() {
         state = SubmitState.Loading
         scope.launch {
             try {
-                val response = submitQueuedReplicate(
-                    QueuedReplicate(image, session, aiPredictedGrains, confirmedGrains, weight)
-                )
+                val response = submitQueuedReplicate(queuedItem)
                 state = SubmitState.Success(response)
             } catch (e: Exception) {
                 // Broad catch is deliberate: connection refused, timeout,
@@ -116,11 +115,7 @@ fun SubmitScreen(
                 sampleId = session.sampleId,
                 confirmedGrainCount = confirmedGrains.size,
                 onRetry = { submit() },
-                onKeepOnDevice = {
-                    onKeepOnDevice(
-                        QueuedReplicate(image, session, aiPredictedGrains, confirmedGrains, weight)
-                    )
-                }
+                onKeepOnDevice = { onKeepOnDevice(queuedItem) }
             )
         }
         else -> {
