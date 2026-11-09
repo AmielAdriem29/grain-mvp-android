@@ -6,6 +6,10 @@ import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.net.Uri
 import android.widget.FrameLayout
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
@@ -53,6 +57,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -102,8 +107,8 @@ fun CameraPreviewScreen(
         )
     }
 
-    val permissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
-        contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
     ) { granted -> hasCameraPermission = granted }
 
     var capturedImage by remember { mutableStateOf<Bitmap?>(null) }
@@ -112,26 +117,26 @@ fun CameraPreviewScreen(
     // here rather than inside CaptureScreen -- that lets both the
     // permission-request screen and the capture screen offer it, even
     // when the technician hasn't granted camera access yet.
-    val galleryLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
-        contract = androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia()
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
     ) { uri: Uri? ->
         if (uri != null) {
             val bitmap = processPickedImage(context, uri)
             if (bitmap != null) {
                 capturedImage = bitmap
             } else {
-                android.widget.Toast.makeText(
+                Toast.makeText(
                     context,
                     "Couldn't use that photo — try one that's at least ${ImageSpec.SIZE_PX}x${ImageSpec.SIZE_PX}.",
-                    android.widget.Toast.LENGTH_LONG
+                    Toast.LENGTH_LONG
                 ).show()
             }
         }
     }
     val onPickFromGallery = {
         galleryLauncher.launch(
-            androidx.activity.result.PickVisualMediaRequest(
-                androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly
+            PickVisualMediaRequest(
+                ActivityResultContracts.PickVisualMedia.ImageOnly
             )
         )
     }
@@ -361,7 +366,7 @@ private fun CaptureScreen(sampleId: String, onCaptured: (Bitmap) -> Unit, onPick
                     "Fill the frame with the tray. Keep the phone flat.",
                     color = Color.White.copy(alpha = 0.82f),
                     fontSize = 14.sp,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    textAlign = TextAlign.Center,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .padding(horizontal = 40.dp)

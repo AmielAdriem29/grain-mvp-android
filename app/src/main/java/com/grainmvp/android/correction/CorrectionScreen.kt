@@ -63,6 +63,7 @@ import com.grainmvp.android.ui.theme.Accent900
 import com.grainmvp.android.ui.theme.AccentGreen
 import com.grainmvp.android.ui.theme.DetectionBlue
 import com.grainmvp.android.ui.theme.DividerColor
+import com.grainmvp.android.ui.theme.ErrorRed
 import com.grainmvp.android.ui.theme.Neutral500
 import com.grainmvp.android.ui.theme.Neutral700
 import com.grainmvp.android.ui.theme.SurfaceBg
@@ -407,7 +408,7 @@ fun CorrectionScreen(
             Text(
                 "Enter a valid weight in grams (e.g. 12.45)",
                 fontSize = 12.sp,
-                color = com.grainmvp.android.ui.theme.ErrorRed,
+                color = ErrorRed,
                 modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 6.dp)
             )
         }
