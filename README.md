@@ -1,9 +1,12 @@
 # Grain MVP — Android App
 
-Rice grain grading MVP. Technician photographs a rice sample, an AI model
-proposes bounding boxes over individual grains, the technician corrects
-those boxes and enters a weight, and the record is submitted to the
-backend for later review on a separate dashboard.
+## Project Description
+
+A rice grain grading app for field technicians. The technician photographs
+a rice sample, an AI model detects the immature grains and draws a
+bounding box over each one, and the technician corrects those boxes and
+enters the sample weight. The record is then submitted to the backend,
+which grades the sample and stores it for review on a separate dashboard.
 
 This repo covers the **Android client only**. It talks to a separately-built
 FastAPI backend over two endpoints. Full contract is in `docs/SPEC.md`.
@@ -20,14 +23,58 @@ FastAPI backend over two endpoints. Full contract is in `docs/SPEC.md`.
   where detailed per-phase notes live going forward — **update it every
   time a phase's code changes**, not just when a phase finishes.
 
-## Stack
+## Tech Stack
 
 - Kotlin + Jetpack Compose, Material3
 - CameraX 1.3.4 (camera preview, capture)
-- Retrofit + OkHttp + kotlinx.serialization (networking)
+- Retrofit with OkHttp (networking)
+- kotlinx.serialization (JSON)
+- Supabase Auth via supabase-kt (technician sign-in)
 - Custom Material3 theme derived from the PhilRice/Dept. of Agriculture
   seal (deep green, gold, warm off-white) — see `ui/theme/`
 - minSdk 26, targetSdk 34
+
+## Setup and Installation
+
+1. Clone the repository:
+   ```
+   git clone https://github.com/AmielAdriem29/grain-mvp-android.git
+   ```
+2. Open the project folder in Android Studio.
+3. Set the Gradle JDK to 17 or 21 (Settings > Build, Execution,
+   Deployment > Build Tools > Gradle).
+4. Create `local.properties` in the project root with the keys listed
+   under [Configuration](#configuration). Ask the team for the values.
+5. Connect an Android device (Android 8.0 / API 26 or newer) with USB
+   debugging enabled, then run the `app` configuration.
+
+Unit tests run without `local.properties`:
+```
+./gradlew testDebugUnitTest
+```
+
+## Configuration
+
+Real values are **never committed**. They live in the gitignored
+`local.properties` file at the project root, under these keys:
+
+| Key | Purpose |
+|---|---|
+| `backend.baseUrl` | Base URL of the backend API |
+| `supabase.url` | Supabase project URL |
+| `supabase.pubKey` | Supabase publishable key |
+
+At build time (see `app/build.gradle.kts`) these are read into
+`BuildConfig.BACKEND_BASE_URL`, `BuildConfig.SUPABASE_URL` and
+`BuildConfig.SUPABASE_PUB_KEY`. If a key is missing, the build falls back to
+an obvious placeholder, so the project still compiles for anyone who hasn't
+created `local.properties` yet. The `backend.baseUrl` fallback is
+`http://10.0.2.2:8000`, the Android emulator's alias for the host
+machine's `localhost`.
+
+## Deployed Backend URL
+
+https://immaturebackend.onrender.com
 
 ## Git Workflow
 
@@ -53,7 +100,7 @@ One logical change per commit.
 |---|---|---|---|
 | 0 — bare-bones skeleton | `master` | No | ✅ done |
 | 1 — Camera, crop, downscale to 1024×1024 | `phase-1-camera-crop` | No | ✅ done, verified on real device |
-| 2 — Networking (Retrofit, auth interceptor, 2 endpoints) | `phase-2-networking` | Yes (BASE_URL + API_KEY) | ✅ code done — checkpoint (real call verification) blocked on backend being reachable |
+| 2 — Networking (Retrofit, auth interceptor, 2 endpoints) | `phase-2-networking` | Yes (BASE_URL) | ✅ code done — checkpoint (real call verification) blocked on backend being reachable |
 | 3 — Correction screen (tap to toggle/add boxes) | `phase-3-correction-screen` | No | ✅ done, verified on-device |
 | 4 — Submit flow | `phase-4-submit` | Yes | ✅ code done — same backend blocker as Phase 2 |
 | 5 — Polish (tests, theme, Home screen, weight validation) | `phase-5-polish` | No | ✅ done |
@@ -61,27 +108,6 @@ One logical change per commit.
 All phases merged into `develop` and `master`. **MVP is feature-complete
 as of this milestone** — see `docs/IMPLEMENTATION.md` for exactly what's
 verified vs. what's still blocked on the backend existing.
-
-## Connection Details
-
-Real values are **never committed**. They live in a gitignored
-`local.properties` file at the project root:
-
-```properties
-backend.baseUrl=http://10.0.2.2:8000
-backend.apiKey=<the real key, once the backend owner provides one>
-```
-
-These get read into `BuildConfig.BACKEND_BASE_URL` / `BuildConfig.BACKEND_API_KEY`
-at build time (see `app/build.gradle.kts`). If `local.properties` doesn't
-set these, the build falls back to the emulator's host-loopback alias
-(`10.0.2.2`) and an obviously-fake placeholder key, so the project still
-compiles for anyone who hasn't set up their own `local.properties` yet.
-
-`10.0.2.2` is the Android emulator's special alias for your host
-machine's `localhost` — if the backend is running locally on someone
-else's machine (not yours), you'll need their actual reachable address
-instead.
 
 ## Things To Sort With the Team
 
