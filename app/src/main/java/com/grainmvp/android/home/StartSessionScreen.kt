@@ -4,6 +4,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -18,6 +19,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.res.painterResource
@@ -32,6 +34,7 @@ import com.grainmvp.android.ui.components.PrimaryActionButton
 import com.grainmvp.android.ui.components.SecondaryActionButton
 import com.grainmvp.android.ui.theme.AccentGreen
 import com.grainmvp.android.ui.theme.Accent700
+import com.grainmvp.android.ui.theme.DividerColor
 import com.grainmvp.android.ui.theme.Neutral600
 import com.grainmvp.android.ui.theme.Neutral700
 import com.grainmvp.android.ui.theme.SurfaceBg
@@ -70,7 +73,7 @@ fun StartSessionScreen(
             .padding(24.dp)
     ) {
         Row(
-            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+            verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Image(
@@ -109,7 +112,7 @@ fun StartSessionScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 24.dp),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(
+            contentPadding = PaddingValues(
                 horizontal = 16.dp,
                 vertical = 18.dp
             )
@@ -190,7 +193,7 @@ private fun LabeledField(
             shape = RectangleShape,
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = AccentGreen,
-                unfocusedBorderColor = com.grainmvp.android.ui.theme.DividerColor,
+                unfocusedBorderColor = DividerColor,
                 focusedTextColor = TextPrimaryGranular,
                 unfocusedTextColor = TextPrimaryGranular
             ),
