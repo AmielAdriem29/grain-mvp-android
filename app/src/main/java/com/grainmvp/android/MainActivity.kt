@@ -3,6 +3,7 @@ package com.grainmvp.android
 import android.content.Context
 import android.graphics.Bitmap
 import android.os.Bundle
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -265,6 +266,7 @@ private suspend fun sendQueuedReplicates(context: Context, queue: MutableList<Qu
         } catch (e: Exception) {
             // Leave it queued; the technician can tap "Send" again once
             // they actually have a connection.
+            Log.w("MainActivity", "Queued sample ${item.session.sampleId} failed to send", e)
         }
     }
 
