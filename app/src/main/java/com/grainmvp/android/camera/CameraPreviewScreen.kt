@@ -436,10 +436,7 @@ private fun CaptureScreen(sampleId: String, onCaptured: (Bitmap) -> Unit, onPick
                                         }
 
                                         override fun onError(exception: ImageCaptureException) {
-                                            // Phase 5 polish adds a user-visible error
-                                            // message here. For now, the technician
-                                            // just sees the shutter didn't advance
-                                            // to Review and can tap again.
+                                            Toast.makeText(context, "Couldn't take the photo. Try again.", Toast.LENGTH_SHORT).show()
                                         }
                                     }
                                 )
