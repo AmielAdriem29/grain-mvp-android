@@ -28,9 +28,11 @@ import com.grainmvp.android.ui.theme.SurfaceBg
 /**
  * Screen 08 (Result) of the GRANULAR field redesign. The grade is the
  * reason the technician is here, so it gets the whole plate (the green
- * [BlueprintFrame] below). "Next sample" keeps the same technician and
- * increments the sample ID (via [incrementSampleId]), going straight
- * back to Capture and skipping Start Session -- see MainActivity.
+ * [BlueprintFrame] below). "Add second sample" (only after sample 1)
+ * goes straight back to Capture for sample 2 of the same entry.
+ * "Next sample" returns to Start Session with the technician, season and
+ * incremented sample ID (via [incrementSampleId]) prefilled -- see
+ * MainActivity.
  */
 @Composable
 fun ResultScreen(
@@ -38,6 +40,7 @@ fun ResultScreen(
     session: SessionInfo,
     weight: String,
     confirmedGrainCount: Int,
+    onAddSecondSample: () -> Unit,
     onNextSample: () -> Unit,
     onEndSession: () -> Unit
 ) {
@@ -47,6 +50,8 @@ fun ResultScreen(
     // since it's derived, not backend-supplied (see docs/IMPLEMENTATION.md).
     val totalGrains = totalGrainCount(confirmedGrainCount, response.percentage)
     val nextSampleId = session.nextSample().sampleId
+    // "Not classified" is far wider than "G1", so it gets a smaller size.
+    val gradeFontSize = if (response.grade.length <= 3) 76.sp else 40.sp
 
     Column(
         modifier = Modifier
@@ -84,12 +89,12 @@ fun ResultScreen(
                 response.grade,
                 fontFamily = FontFamily.SansSerif,
                 fontWeight = FontWeight.Bold,
-                fontSize = 76.sp,
-                lineHeight = 76.sp,
+                fontSize = gradeFontSize,
+                lineHeight = gradeFontSize,
                 color = Color.White
             )
             Text(
-                "${response.percentage}% immature",
+                "${formatPercentage(response.percentage)}% immature",
                 modifier = Modifier.padding(top = 8.dp),
                 fontFamily = FontFamily.SansSerif,
                 fontWeight = FontWeight.SemiBold,
@@ -101,6 +106,15 @@ fun ResultScreen(
         Column(modifier = Modifier.padding(top = 20.dp)) {
             SummaryRow("Grains", "$confirmedGrainCount of $totalGrains")
             RowDivider()
+            SummaryRow("Sample", "${session.sampleNo} of 2")
+            RowDivider()
+            response.meetsRecommendedValue?.let { meets ->
+                SummaryRow(
+                    "Recommended value",
+                    if (meets) "Meets (below 2.0%)" else "Does not meet"
+                )
+                RowDivider()
+            }
             SummaryRow("Weight", "$weight g")
             RowDivider()
             SummaryRow("Technician", session.technicianName)
@@ -113,6 +127,13 @@ fun ResultScreen(
             onClick = onNextSample,
             modifier = Modifier.fillMaxWidth()
         )
+        if (session.sampleNo == 1) {
+            SecondaryActionButton(
+                text = "Add second sample",
+                onClick = onAddSecondSample,
+                modifier = Modifier.fillMaxWidth().padding(top = 10.dp)
+            )
+        }
         SecondaryActionButton(
             text = "End session",
             onClick = onEndSession,

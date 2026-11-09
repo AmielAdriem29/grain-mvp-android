@@ -9,8 +9,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
@@ -29,12 +32,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.grainmvp.android.R
 import com.grainmvp.android.session.SessionInfo
+import com.grainmvp.android.session.isValidSeason
+import com.grainmvp.android.session.normalizeSeason
 import com.grainmvp.android.ui.components.BlueprintFrame
 import com.grainmvp.android.ui.components.PrimaryActionButton
 import com.grainmvp.android.ui.components.SecondaryActionButton
 import com.grainmvp.android.ui.theme.AccentGreen
 import com.grainmvp.android.ui.theme.Accent700
 import com.grainmvp.android.ui.theme.DividerColor
+import com.grainmvp.android.ui.theme.ErrorRed
 import com.grainmvp.android.ui.theme.Neutral600
 import com.grainmvp.android.ui.theme.Neutral700
 import com.grainmvp.android.ui.theme.SurfaceBg
@@ -59,12 +65,29 @@ import com.grainmvp.android.ui.theme.TextPrimaryGranular
 @Composable
 fun StartSessionScreen(
     defaultTechnicianName: String,
+    defaultSeason: String,
+    defaultSampleId: String,
     queuedCount: Int,
     onSendQueued: () -> Unit,
     onStartScan: (session: SessionInfo) -> Unit
 ) {
     var technicianName by remember { mutableStateOf(defaultTechnicianName) }
-    var sampleId by remember { mutableStateOf("") }
+    var season by remember { mutableStateOf(defaultSeason) }
+    var indexNumber by remember { mutableStateOf("") }
+    var selectionName by remember { mutableStateOf("") }
+    var sampleId by remember { mutableStateOf(defaultSampleId) }
+
+    val normalizedSeason = normalizeSeason(season)
+    val seasonError = if (season.isNotBlank() && !isValidSeason(normalizedSeason)) {
+        "Use a 4-digit year followed by DS or WS, e.g. 2026WS"
+    } else {
+        null
+    }
+    val canStart = technicianName.isNotBlank() &&
+            isValidSeason(normalizedSeason) &&
+            indexNumber.isNotBlank() &&
+            selectionName.isNotBlank() &&
+            sampleId.isNotBlank()
 
     Column(
         modifier = Modifier
@@ -72,81 +95,123 @@ fun StartSessionScreen(
             .background(SurfaceBg)
             .padding(24.dp)
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Image(
-                painter = painterResource(R.drawable.granular_logo),
-                contentDescription = null,
-                modifier = Modifier.size(30.dp)
-            )
-            Text(
-                "GRANULAR",
-                fontFamily = FontFamily.SansSerif,
-                fontWeight = FontWeight.Bold,
-                fontSize = 20.sp,
-                letterSpacing = 1.2.sp,
-                color = TextPrimaryGranular
-            )
-        }
-
-        Column(modifier = Modifier.padding(top = 24.dp)) {
-            Text(
-                "Rice grain quality assessment",
-                fontFamily = FontFamily.SansSerif,
-                fontWeight = FontWeight.Bold,
-                fontSize = 30.sp,
-                lineHeight = 32.sp,
-                color = TextPrimaryGranular
-            )
-            Text(
-                "Photograph a sample, correct the detection, submit the replicate.",
-                modifier = Modifier.padding(top = 8.dp),
-                fontSize = 14.sp,
-                color = Neutral700
-            )
-        }
-
-        BlueprintFrame(
+        // The form scrolls so the five fields and the on-screen keyboard
+        // fit on small phones; the Start button below stays pinned.
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 24.dp),
-            contentPadding = PaddingValues(
-                horizontal = 16.dp,
-                vertical = 18.dp
-            )
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
         ) {
-            Text(
-                "NEW SESSION",
-                fontFamily = FontFamily.SansSerif,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 11.sp,
-                letterSpacing = 1.6.sp,
-                color = Accent700
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Image(
+                    painter = painterResource(R.drawable.granular_logo),
+                    contentDescription = null,
+                    modifier = Modifier.size(30.dp)
+                )
+                Text(
+                    "GRANULAR",
+                    fontFamily = FontFamily.SansSerif,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 20.sp,
+                    letterSpacing = 1.2.sp,
+                    color = TextPrimaryGranular
+                )
+            }
 
-            LabeledField(
-                label = "Technician",
-                value = technicianName,
-                onValueChange = { technicianName = it },
-                modifier = Modifier.padding(top = 14.dp)
-            )
+            Column(modifier = Modifier.padding(top = 24.dp)) {
+                Text(
+                    "Rice grain quality assessment",
+                    fontFamily = FontFamily.SansSerif,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 30.sp,
+                    lineHeight = 32.sp,
+                    color = TextPrimaryGranular
+                )
+                Text(
+                    "Photograph a sample, correct the detection, submit the replicate.",
+                    modifier = Modifier.padding(top = 8.dp),
+                    fontSize = 14.sp,
+                    color = Neutral700
+                )
+            }
 
-            LabeledField(
-                label = "Sample ID",
-                value = sampleId,
-                onValueChange = { sampleId = it },
-                modifier = Modifier.padding(top = 14.dp)
-            )
+            BlueprintFrame(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 24.dp),
+                contentPadding = PaddingValues(
+                    horizontal = 16.dp,
+                    vertical = 18.dp
+                )
+            ) {
+                Text(
+                    "NEW SESSION",
+                    fontFamily = FontFamily.SansSerif,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 11.sp,
+                    letterSpacing = 1.6.sp,
+                    color = Accent700
+                )
+
+                LabeledField(
+                    label = "Technician",
+                    value = technicianName,
+                    onValueChange = { technicianName = it },
+                    modifier = Modifier.padding(top = 14.dp)
+                )
+
+                LabeledField(
+                    label = "Season",
+                    value = season,
+                    onValueChange = { season = it },
+                    placeholder = "e.g. 2026WS",
+                    error = seasonError,
+                    modifier = Modifier.padding(top = 14.dp)
+                )
+
+                LabeledField(
+                    label = "Index No.",
+                    value = indexNumber,
+                    onValueChange = { indexNumber = it },
+                    modifier = Modifier.padding(top = 14.dp)
+                )
+
+                LabeledField(
+                    label = "Selection Name",
+                    value = selectionName,
+                    onValueChange = { selectionName = it },
+                    modifier = Modifier.padding(top = 14.dp)
+                )
+
+                LabeledField(
+                    label = "Sample ID",
+                    value = sampleId,
+                    onValueChange = { sampleId = it },
+                    modifier = Modifier.padding(top = 14.dp)
+                )
+            }
         }
 
-        Spacer(modifier = Modifier.weight(1f))
+        Spacer(modifier = Modifier.height(12.dp))
 
         PrimaryActionButton(
             text = "Start scan",
-            enabled = technicianName.isNotBlank() && sampleId.isNotBlank(),
-            onClick = { onStartScan(SessionInfo(technicianName.trim(), sampleId.trim())) },
+            enabled = canStart,
+            onClick = {
+                onStartScan(
+                    SessionInfo(
+                        technicianName = technicianName.trim(),
+                        season = normalizedSeason,
+                        indexNumber = indexNumber.trim(),
+                        selectionName = selectionName.trim(),
+                        sampleId = sampleId.trim(),
+                        sampleNo = 1
+                    )
+                )
+            },
             modifier = Modifier.fillMaxWidth()
         )
 
@@ -177,7 +242,9 @@ private fun LabeledField(
     label: String,
     value: String,
     onValueChange: (String) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    placeholder: String? = null,
+    error: String? = null
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
         Text(
@@ -190,6 +257,9 @@ private fun LabeledField(
             value = value,
             onValueChange = onValueChange,
             singleLine = true,
+            isError = error != null,
+            placeholder = placeholder?.let { { Text(it, color = Neutral600) } },
+            supportingText = error?.let { { Text(it, color = ErrorRed) } },
             shape = RectangleShape,
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = AccentGreen,
