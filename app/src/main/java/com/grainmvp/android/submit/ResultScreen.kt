@@ -24,7 +24,6 @@ import com.grainmvp.android.ui.theme.Accent700
 import com.grainmvp.android.ui.theme.ResultEyebrow
 import com.grainmvp.android.ui.theme.ResultPlateBg
 import com.grainmvp.android.ui.theme.SurfaceBg
-import kotlin.math.roundToInt
 
 /**
  * Screen 08 (Result) of the GRANULAR field redesign. The grade is the
@@ -46,11 +45,7 @@ fun ResultScreen(
     // (not a guess) from percentage = immature/total * 100, i.e.
     // total = immature / (percentage / 100). Worth a one-line comment
     // since it's derived, not backend-supplied (see docs/IMPLEMENTATION.md).
-    val totalGrains = if (response.percentage > 0.0) {
-        (confirmedGrainCount / (response.percentage / 100.0)).roundToInt()
-    } else {
-        confirmedGrainCount
-    }
+    val totalGrains = totalGrainCount(confirmedGrainCount, response.percentage)
     val nextSampleId = session.nextSample().sampleId
 
     Column(
