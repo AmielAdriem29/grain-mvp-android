@@ -93,7 +93,7 @@ fun acceptedWeights(results: List<SubmittedPhoto>): List<BigDecimal>?
 ### 6. Session results (MainActivity)
 
 ```kotlin
-data class SubmittedPhoto(val session: SessionInfo, val weight: String, val manuallyOverridden: Boolean, val response: ReplicateResponse)
+data class SubmittedPhoto(val session: SessionInfo, val weight: String, val response: ReplicateResponse)
 ```
 
 - `MainActivity` holds `val submittedPhotos = remember { mutableStateListOf<SubmittedPhoto>() }`.
