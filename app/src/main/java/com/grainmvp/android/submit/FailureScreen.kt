@@ -50,16 +50,10 @@ fun FailureScreen(
     exceptionClassName: String,
     httpCode: Int?,
     sampleId: String,
-    sampleNo: Int,
     confirmedGrainCount: Int,
     onRetry: () -> Unit,
-    onKeepOnDevice: () -> Unit,
-    onSkipSample: () -> Unit
+    onKeepOnDevice: () -> Unit
 ) {
-    // 409: the backend already has this season, index number and sample
-    // number, so retrying or queueing the same record can never succeed.
-    val isDuplicate = httpCode == HTTP_CONFLICT
-
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -92,19 +86,13 @@ fun FailureScreen(
                 color = FailureEyebrow
             )
             Text(
-                if (isDuplicate) duplicateSampleMessage(sampleNo) else friendlyErrorMessage(
-                    exceptionClassName
-                ),
+                if (httpCode == HTTP_CONFLICT) REPLICATE_CONFLICT_MESSAGE else friendlyErrorMessage(exceptionClassName),
                 modifier = Modifier.padding(top = 8.dp),
                 fontSize = 16.sp,
                 color = Neutral900
             )
             Text(
-                if (isDuplicate) {
-                    "Nothing new was saved for $sampleId."
-                } else {
-                    "$sampleId is held on this device. Retry now, or keep scanning and send it later."
-                },
+                "$sampleId is held on this device. Retry now, or keep scanning and send it later.",
                 modifier = Modifier.padding(top = 6.dp),
                 fontSize = 13.sp,
                 color = Neutral700
@@ -131,32 +119,24 @@ fun FailureScreen(
 
         Spacer(modifier = Modifier.weight(1f))
 
-        if (isDuplicate) {
-            PrimaryActionButton(
-                text = "Continue to next sample",
-                onClick = onSkipSample,
-                modifier = Modifier.fillMaxWidth()
-            )
-        } else {
-            PrimaryActionButton(
-                text = "Retry now",
-                onClick = onRetry,
-                modifier = Modifier.fillMaxWidth()
-            )
-            SecondaryActionButton(
-                text = "Keep on device",
-                onClick = onKeepOnDevice,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 10.dp)
-            )
-        }
+        PrimaryActionButton(
+            text = "Retry now",
+            onClick = onRetry,
+            modifier = Modifier.fillMaxWidth()
+        )
+        SecondaryActionButton(
+            text = "Keep on device",
+            onClick = onKeepOnDevice,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 10.dp)
+        )
     }
 }
 
-/** Plain-language explanation of a 409 (UC-1.5.1 EF-2): the entry already has this sample number. */
-private fun duplicateSampleMessage(sampleNo: Int): String =
-    "This entry already has a sample $sampleNo. Check the index number and sample number."
+/** Plain-language explanation of a 409: a replicate number collision on the server. Nothing was saved. */
+private const val REPLICATE_CONFLICT_MESSAGE =
+    "Another photo of this sample was sent at the same moment. Retry."
 
 /**
  * Maps an exception's simple class name to a plain-language sentence.
