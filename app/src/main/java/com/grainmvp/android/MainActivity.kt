@@ -36,8 +36,8 @@ import com.grainmvp.android.network.GrainBox
 import com.grainmvp.android.network.SupabaseAuth
 import com.grainmvp.android.session.SessionInfo
 import com.grainmvp.android.submit.QueuedReplicate
-import com.grainmvp.android.submit.isDuplicateSampleError
 import com.grainmvp.android.submit.SubmitScreen
+import com.grainmvp.android.submit.SubmittedPhoto
 import com.grainmvp.android.submit.submitQueuedReplicate
 import com.grainmvp.android.ui.theme.GrainMvpTheme
 import kotlinx.coroutines.launch
@@ -51,6 +51,11 @@ import java.time.Instant
  *    sample ID -- collected here, not on Submit)
  *  - Capture -> Detect -> Correction -> Submit, all carrying the same
  *    [SessionInfo], plus the time the photo was captured
+ *  - Result's "Take another photo of this sample" goes back to Capture
+ *    with the same session; backend `dev` numbers it as the next
+ *    replicate (-02, -03 ...) and auto-accepts the sample at two GOOD
+ *    photos. Successful sends are kept in `submittedPhotos` so Result can
+ *    show the sample's average (submit/SampleAverage.kt)
  *  - Result's "Add second sample" goes straight back to Capture for
  *    sample 2 of the same entry; "Next sample" returns to Start Session
  *    with technician, season and the next sample ID prefilled
@@ -153,6 +158,9 @@ fun GrainMvpApp() {
     // the app is killed; a disk-backed version that survives an app
     // restart is tracked as follow-up work.
     val replicateQueue = remember { mutableStateListOf<QueuedReplicate>() }
+    // Photos sent successfully this session, so Result can show a sample's
+    // average once the backend auto-accepts it. In-memory, cleared on End session.
+    val submittedPhotos = remember { mutableStateListOf<SubmittedPhoto>() }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
@@ -170,7 +178,7 @@ fun GrainMvpApp() {
                         defaultSampleId = lastSampleId,
                         queuedCount = replicateQueue.size,
                         onSendQueued = {
-                            scope.launch { sendQueuedReplicates(context, replicateQueue) }
+                            scope.launch { sendQueuedReplicates(context, replicateQueue, submittedPhotos) }
                         },
                         onStartScan = { session ->
                             lastTechnicianName = session.technicianName
@@ -254,9 +262,16 @@ fun GrainMvpApp() {
                         confirmedGrains = currentScreen.confirmedGrains,
                         weight = currentScreen.weight,
                         capturedAt = currentScreen.capturedAt,
+                        submittedPhotos = submittedPhotos,
+                        onSubmitted = { submittedPhotos.add(it) },
                         onEndSession = {
                             lastSampleId = ""
+                            submittedPhotos.clear()
                             screen = Screen.Welcome
+                        },
+                        onAnotherPhoto = {
+                            // Same sample again: the backend numbers it as the next replicate.
+                            screen = Screen.Capture(currentScreen.session)
                         },
                         onAddSecondSample = { secondSession ->
                             // Same entry, sample 2: skip Start Session.
@@ -297,27 +312,24 @@ fun GrainMvpApp() {
  * manual, technician-triggered retry ("Send N queued" on Start
  * Session), not a background job.
  */
-private suspend fun sendQueuedReplicates(context: Context, queue: MutableList<QueuedReplicate>) {
+private suspend fun sendQueuedReplicates(
+    context: Context,
+    queue: MutableList<QueuedReplicate>,
+    submittedPhotos: MutableList<SubmittedPhoto>
+) {
     val toSend = queue.toList()
     if (toSend.isEmpty()) return
 
     var sentCount = 0
     for (item in toSend) {
         try {
-            submitQueuedReplicate(item)
+            val response = submitQueuedReplicate(item)
             queue.remove(item)
+            submittedPhotos.add(SubmittedPhoto(item.session, item.weight, response))
             sentCount++
         } catch (e: Exception) {
-            if (isDuplicateSampleError(e)) {
-                // 409: an earlier attempt for this season, index number and
-                // sample number was already saved (SDD 1.6). Nothing left
-                // to send, so drop it from the queue and count it as sent.
-                queue.remove(item)
-                sentCount++
-                continue
-            }
-            // Leave it queued; the technician can tap "Send" again once
-            // they actually have a connection.
+            // Leave it queued, including a 409 (replicate number collision,
+            // nothing saved); the technician can tap "Send" again.
             Log.w("MainActivity", "Queued sample ${item.session.sampleId} failed to send", e)
         }
     }
