@@ -41,7 +41,8 @@ $adb = Find-Adb
 $devices = & $adb devices | Select-String "`tdevice$"
 if ($devices.Count -ne 1) { throw "Connect exactly one emulator or phone (found $($devices.Count))." }
 
-$backendRootFull = (Resolve-Path $BackendRoot).Path.TrimEnd('\') + '\'
+# Forward slashes: a trailing '\' before a closing quote would escape the quote on the dotnet command line.
+$backendRootFull = (Resolve-Path $BackendRoot).Path.TrimEnd('\').Replace('\', '/') + '/'
 $androidCommit = (git -C $repo rev-parse --short HEAD)
 $backendCommit = (git -C $backendRootFull rev-parse --short HEAD)
 $backendBranch = (git -C $backendRootFull rev-parse --abbrev-ref HEAD)
