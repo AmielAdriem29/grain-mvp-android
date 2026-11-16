@@ -34,6 +34,7 @@ interface ApiService {
         @Part("indexNumber") indexNumber: RequestBody,
         @Part("selectionName") selectionName: RequestBody,
         @Part("sampleNo") sampleNo: RequestBody,
+        @Part("manuallyOverridden") manuallyOverridden: RequestBody,
         @Part("capturedAt") capturedAt: RequestBody,
         @Part("submittedAt") submittedAt: RequestBody
     ): ReplicateResponse

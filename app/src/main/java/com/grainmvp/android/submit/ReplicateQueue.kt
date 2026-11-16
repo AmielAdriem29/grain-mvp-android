@@ -9,7 +9,6 @@ import com.grainmvp.android.network.toTextPart
 import com.grainmvp.android.session.SessionInfo
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import retrofit2.HttpException
 import java.time.Instant
 
 /**
@@ -34,16 +33,18 @@ data class QueuedReplicate(
     val aiPredictedGrains: List<GrainBox>,
     val confirmedGrains: List<GrainBox>,
     val weight: String,
+    /** Technician ticked "I verified this count manually"; the backend then marks the photo GOOD. */
+    val manuallyOverridden: Boolean,
     val capturedAt: Instant,
     val submittedAt: Instant
 )
 
-/** HTTP status the backend returns when the season, index number and sample number already exist. */
+/**
+ * HTTP status the backend returns when it could not assign a replicate
+ * number because another photo of the same sample arrived at the same
+ * moment. Retryable: nothing was saved.
+ */
 const val HTTP_CONFLICT = 409
-
-/** Whether [error] is the backend's 409 for a duplicate sample (REQ-405). */
-fun isDuplicateSampleError(error: Throwable): Boolean =
-    error is HttpException && error.code() == HTTP_CONFLICT
 
 /**
  * Calls POST /api/replicate for [item]. Shared by SubmitScreen's own
@@ -65,6 +66,7 @@ suspend fun submitQueuedReplicate(item: QueuedReplicate): ReplicateResponse {
         indexNumber = item.session.indexNumber.toTextPart(),
         selectionName = item.session.selectionName.toTextPart(),
         sampleNo = item.session.sampleNo.toString().toTextPart(),
+        manuallyOverridden = item.manuallyOverridden.toString().toTextPart(),
         capturedAt = item.capturedAt.toString().toTextPart(),
         submittedAt = item.submittedAt.toString().toTextPart()
     )
