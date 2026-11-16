@@ -66,7 +66,7 @@ EXIT_CODE=$?
 set -e
 
 LOG="$RESULTS/$SUITE-logcat.txt"
-"$ADB" logcat -d -v time -s GrainTest:I GrainPerf:I GrainPerf:W TestRunner:I > "$LOG"
+"$ADB" logcat -d -v time -s GrainTest:I GrainPerf:I TestRunner:I > "$LOG"
 
 {
   echo "# Android $SUITE tests"

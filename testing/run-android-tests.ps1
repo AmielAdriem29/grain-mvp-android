@@ -12,10 +12,12 @@
 param(
     [Parameter(Mandatory = $true)][ValidateSet('integration', 'performance')][string]$Suite,
     [int]$Port = 8000,
-    [string]$BackendRoot = (Join-Path $PSScriptRoot '..\..\ImmatureBackend')
+    [string]$BackendRoot = ''
 )
 
 $ErrorActionPreference = 'Stop'
+# Set here, not as the param default: Windows PowerShell 5.1 leaves $PSScriptRoot empty in param defaults.
+if (-not $BackendRoot) { $BackendRoot = Join-Path $PSScriptRoot '..\..\ImmatureBackend' }
 $repo = Resolve-Path (Join-Path $PSScriptRoot '..')
 $build = Join-Path $PSScriptRoot 'build'
 $results = Join-Path $build 'results'
@@ -37,6 +39,10 @@ function Find-Adb {
 if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) { throw '.NET 10 SDK not found (dotnet).' }
 docker info *> $null; if ($LASTEXITCODE -ne 0) { throw 'Docker is not running.' }
 if (-not (Test-Path (Join-Path $BackendRoot 'ImmatureBackend.Api'))) { throw "Backend repo not found at $BackendRoot. Pass -BackendRoot." }
+if (-not $env:JAVA_HOME -and -not (Get-Command java -ErrorAction SilentlyContinue)) {
+    $jbr = 'C:\Program Files\Android\Android Studio\jbr'
+    if (Test-Path "$jbr\bin\java.exe") { $env:JAVA_HOME = $jbr } else { throw 'Java not found. Set JAVA_HOME (Android Studio ships one in its jbr folder).' }
+}
 $adb = Find-Adb
 $devices = & $adb devices | Select-String "`tdevice$"
 if ($devices.Count -ne 1) { throw "Connect exactly one emulator or phone (found $($devices.Count))." }
@@ -86,7 +92,7 @@ try {
     } finally { Pop-Location }
 
     $log = Join-Path $results "$Suite-logcat.txt"
-    & $adb logcat -d -v time -s GrainTest:I GrainPerf:I GrainPerf:W TestRunner:I | Out-File $log -Encoding utf8
+    & $adb logcat -d -v time -s GrainTest:I GrainPerf:I TestRunner:I | Out-File $log -Encoding utf8
 
     $summary = Join-Path $results "$Suite-summary.md"
     @"

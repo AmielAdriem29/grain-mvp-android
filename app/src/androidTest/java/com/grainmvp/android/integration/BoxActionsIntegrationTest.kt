@@ -30,9 +30,12 @@ import kotlin.math.abs
 /**
  * TC-INT-01: Box Actions From App to Dashboard (Android -> API -> database).
  *
- * Row a: 6 proposed boxes at known coordinates; in the app keep 3, remove 2,
- * add 1, submit. The backend must store 3 kept, 2 removed, 1 added, with
- * every box's coordinates unchanged.
+ * Row a: in the app keep 3, remove 2, add 1, submit. The backend must store
+ * 3 kept, 2 removed, 1 added, with every box's coordinates unchanged.
+ *
+ * The STD says "6 proposed boxes", but keep 3 + remove 2 covers only 5, and
+ * the app counts every untouched AI box as kept. So this uses 5 proposed
+ * boxes, giving 6 boxes in total once the added one is included.
  *
  * Row b (opening the record on the dashboard) belongs to the dashboard
  * test suite and is not run here.
@@ -50,8 +53,7 @@ class BoxActionsIntegrationTest {
         GrainBox(x = 300, y = 100, width = 24, height = 24, confidence = 0.82f),
         GrainBox(x = 500, y = 100, width = 24, height = 24, confidence = 0.77f),
         GrainBox(x = 100, y = 300, width = 24, height = 24, confidence = 0.66f),
-        GrainBox(x = 300, y = 300, width = 24, height = 24, confidence = 0.58f),
-        GrainBox(x = 500, y = 300, width = 24, height = 24, confidence = 0.95f)
+        GrainBox(x = 300, y = 300, width = 24, height = 24, confidence = 0.58f)
     )
 
     @Before
@@ -88,7 +90,7 @@ class BoxActionsIntegrationTest {
 
         assertBoxesUnchanged("confirmedGrains", confirmed, storedConfirmed)
         assertBoxesUnchanged("aiPredictedGrains", proposed, storedAi)
-        evidence("TC-INT-01-a", "PASS: 3 kept, 2 removed, 1 added; all 12 boxes unchanged")
+        evidence("TC-INT-01-a", "PASS: 3 kept, 2 removed, 1 added; all 11 boxes (5 AI + 6 confirmed) unchanged")
     }
 
     private fun JsonObject.boxes(field: String): List<JsonObject> =

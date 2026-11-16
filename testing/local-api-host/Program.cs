@@ -41,6 +41,9 @@ Environment.SetEnvironmentVariable("Cloudinary__Cloudname", "local");
 Environment.SetEnvironmentVariable("Cloudinary__ApiKey", "local");
 Environment.SetEnvironmentVariable("Cloudinary__ApiSecret", "local");
 Environment.SetEnvironmentVariable("Sentry__Dsn", "");
+// The backend lives in another repo, so the test host can't find it by searching for its solution file.
+// Its appsettings.json and ONNX model are copied next to this program, so use this folder as the content root.
+Environment.SetEnvironmentVariable("ASPNETCORE_TEST_CONTENTROOT_IMMATUREBACKEND_API", AppContext.BaseDirectory);
 
 await using var factory = new LocalApiFactory(signingKey);
 factory.UseKestrel(port);
