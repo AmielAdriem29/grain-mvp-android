@@ -20,3 +20,4 @@ docs/dashboard_v7_spec.md
 signed/
 *.jks
 *.keystore
+/docs/Contexts
