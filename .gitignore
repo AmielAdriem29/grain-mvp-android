@@ -21,3 +21,8 @@ signed/
 *.jks
 *.keystore
 /docs/Contexts
+
+# Local test backend for Android integration/performance tests
+testing/local-api-host/bin/
+testing/local-api-host/obj/
+/docs/Outputs

@@ -39,6 +39,10 @@ android {
         versionCode = 1
         versionName = "0.1.0"
 
+        // Instrumented tests (app/src/androidTest): integration and
+        // performance tests against the local test backend. See testing/README.md.
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
         buildConfigField(
             "String",
             "BACKEND_BASE_URL",
@@ -125,4 +129,9 @@ dependencies {
     // Unit testing — used first for CropMath, the trickiest pure logic
     // in Phase 1. Runs on the JVM, no emulator/device needed.
     testImplementation("junit:junit:4.13.2")
+
+    // Instrumented integration + performance tests (testing/README.md).
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
 }
