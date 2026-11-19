@@ -35,3 +35,17 @@ data class SessionInfo(
         sampleNo = 2
     )
 }
+
+/**
+ * Sample number for an entry given the samples already started this session:
+ * 1 for a new entry, 2 after sample 1, null when the entry already has 2.
+ * Matches the backend grouping (season + index number, exact match).
+ */
+fun sampleNoFor(season: String, indexNumber: String, started: List<SessionInfo>): Int? {
+    val numbers = started.filter { it.season == season && it.indexNumber == indexNumber }.map { it.sampleNo }.toSet()
+    return when {
+        numbers.isEmpty() -> 1
+        2 !in numbers -> 2
+        else -> null
+    }
+}
