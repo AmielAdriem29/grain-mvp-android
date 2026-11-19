@@ -29,23 +29,17 @@ data class SessionInfo(
         sampleNo = 1
     )
 
-    /** The second sample of the same entry: same entry details, next sample ID, sample number 2. */
+    /** The second sample of the same entry: same entry details, sample number 2 and its generated sample ID. */
     fun secondSample(): SessionInfo = copy(
-        sampleId = incrementSampleId(sampleId),
+        sampleId = sampleIdFor(season, indexNumber, 2),
         sampleNo = 2
     )
 }
 
 /**
- * Sample number for an entry given the samples already started this session:
- * 1 for a new entry, 2 after sample 1, null when the entry already has 2.
- * Matches the backend grouping (season + index number, exact match).
+ * Whether an entry (season + index number, exact match like the backend
+ * grouping) already has a sample started this session. The Another sample
+ * form blocks it: sample 2 is started from Result, never by retyping.
  */
-fun sampleNoFor(season: String, indexNumber: String, started: List<SessionInfo>): Int? {
-    val numbers = started.filter { it.season == season && it.indexNumber == indexNumber }.map { it.sampleNo }.toSet()
-    return when {
-        numbers.isEmpty() -> 1
-        2 !in numbers -> 2
-        else -> null
-    }
-}
+fun isEntryInSession(season: String, indexNumber: String, started: List<SessionInfo>): Boolean =
+    started.any { it.season == season && it.indexNumber == indexNumber }

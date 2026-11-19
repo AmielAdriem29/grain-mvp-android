@@ -473,20 +473,25 @@ The technician no longer has to type a weight before Confirm.
   marks the photo GOOD. The "I verified this count manually" checkbox on
   Submit is removed.
 - **Result.** Quality shows AI confidence only, Grains shows the kept count
-  only (the derived "of Y" total and `GrainCount.kt` are removed). Buttons:
-  "Take another photo of this sample" (main), "Take photo of another
-  sample", "End session".
-- **Sample number.** "Take photo of another sample" and "Keep on device"
-  open Start Session as the Another sample form, with the technician fixed.
-  `session/SessionInfo.kt`'s `sampleNoFor` sets the sample number from the
-  samples started since the last End session: the same season + index
-  number becomes sample 2, and a third sample is blocked. These entries are
-  in memory only, so after End session or an app restart the next sample of
-  an entry is sent as sample 1 (accepted known limit).
+  only (the derived "of Y" total and `GrainCount.kt` are removed). Buttons
+  after sample 1: "Take photo of sample 2 of 2" (main), "Retake photo of
+  sample 1", "Take photo of another sample", "End session". After sample 2:
+  "Retake photo of sample 2" (main), "Take photo of another sample", "End
+  session". A retake adds another photo; it does not replace one.
+- **Samples.** Sample 2 of an entry is started only from Result. "Take
+  photo of another sample" and "Keep on device" open Start Session as the
+  Another sample form, with the technician fixed; it always starts sample 1
+  and blocks an entry (season + index number) already started this session
+  (`isEntryInSession` in `session/SessionInfo.kt`). These entries are in
+  memory only, so after End session or an app restart the same entry can
+  be started again as sample 1 (accepted known limit).
+- **Sample ID.** No longer typed. It is generated as
+  `{season}-{index number}-S{sample number}`, e.g. `2026WS-NCT-118-S1`
+  (`sampleIdFor` in `session/SampleId.kt`).
 - **Top grade spelling.** The phone now writes "Not Classified", the
   backend's spelling.
 
-Unit tests cover the new logic (141 passing). The screens were not tested
+Unit tests cover the new logic (142 passing). The screens were not tested
 on a device in this change.
 
 ## Cross-cutting notes (apply to every phase)

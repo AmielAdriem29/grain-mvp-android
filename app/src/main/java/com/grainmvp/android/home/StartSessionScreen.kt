@@ -33,7 +33,8 @@ import androidx.compose.ui.unit.sp
 import com.grainmvp.android.R
 import com.grainmvp.android.session.SessionInfo
 import com.grainmvp.android.session.isValidSeason
-import com.grainmvp.android.session.sampleNoFor
+import com.grainmvp.android.session.sampleIdFor
+import com.grainmvp.android.session.isEntryInSession
 import com.grainmvp.android.session.normalizeSeason
 import com.grainmvp.android.ui.components.BlueprintFrame
 import com.grainmvp.android.ui.components.PrimaryActionButton
@@ -51,7 +52,7 @@ import com.grainmvp.android.ui.theme.TextPrimaryGranular
  * Screen 02 (Start session) of the GRANULAR field redesign.
  *
  * The substantive change this screen exists for: technician name and
- * sample ID are asked here, right after the opening splash, instead of
+ * entry details are asked here, right after the opening splash, instead of
  * on the old Submit screen. By the time the technician reaches Submit
  * (submit/SubmitScreen.kt), it's a read-only confirmation of these two
  * values, not a form -- see MainActivity's Screen.StartSession wiring.
@@ -66,15 +67,16 @@ import com.grainmvp.android.ui.theme.TextPrimaryGranular
  * With [keepTechnician] (Result's "Take photo of another sample", or
  * "Keep on device") the screen becomes the Another sample form: the
  * technician is shown read-only and every other field is asked again.
- * The sample number comes from [sampleNoFor] over [sessionEntries]: the
- * same season + index number as a sample started this session becomes
- * sample 2, and a third sample of an entry cannot be started.
+ * This screen always starts sample 1. An entry (season + index number)
+ * already in [sessionEntries] is blocked ([isEntryInSession]): its sample 2
+ * is started from Result's "Take photo of sample 2 of 2". The sample ID is
+ * not typed: it is generated from season, index number and sample number
+ * ([sampleIdFor]).
  */
 @Composable
 fun StartSessionScreen(
     defaultTechnicianName: String,
     defaultSeason: String,
-    defaultSampleId: String,
     keepTechnician: Boolean,
     sessionEntries: List<SessionInfo>,
     queuedCount: Int,
@@ -85,7 +87,6 @@ fun StartSessionScreen(
     var season by remember { mutableStateOf(defaultSeason) }
     var indexNumber by remember { mutableStateOf("") }
     var selectionName by remember { mutableStateOf("") }
-    var sampleId by remember { mutableStateOf(defaultSampleId) }
 
     val normalizedSeason = normalizeSeason(season)
     val seasonError = if (season.isNotBlank() && !isValidSeason(normalizedSeason)) {
@@ -93,13 +94,12 @@ fun StartSessionScreen(
     } else {
         null
     }
-    val sampleNo = sampleNoFor(normalizedSeason, indexNumber.trim(), sessionEntries)
-    val canStart = sampleNo != null &&
+    val entryInSession = isEntryInSession(normalizedSeason, indexNumber.trim(), sessionEntries)
+    val canStart = !entryInSession &&
             technicianName.isNotBlank() &&
             isValidSeason(normalizedSeason) &&
             indexNumber.isNotBlank() &&
-            selectionName.isNotBlank() &&
-            sampleId.isNotBlank()
+            selectionName.isNotBlank()
 
     Column(
         modifier = Modifier
@@ -107,7 +107,7 @@ fun StartSessionScreen(
             .background(SurfaceBg)
             .padding(24.dp)
     ) {
-        // The form scrolls so the five fields and the on-screen keyboard
+        // The form scrolls so the fields and the on-screen keyboard
         // fit on small phones; the Start button below stays pinned.
         Column(
             modifier = Modifier
@@ -201,8 +201,7 @@ fun StartSessionScreen(
                     label = "Index No.",
                     value = indexNumber,
                     onValueChange = { indexNumber = it },
-                    info = if (indexNumber.isNotBlank() && sampleNo == 2) "Sample 2 of this entry" else null,
-                    error = if (indexNumber.isNotBlank() && sampleNo == null) "This entry already has 2 samples" else null,
+                    error = if (indexNumber.isNotBlank() && entryInSession) "This entry is already in this session" else null,
                     modifier = Modifier.padding(top = 14.dp)
                 )
 
@@ -213,12 +212,6 @@ fun StartSessionScreen(
                     modifier = Modifier.padding(top = 14.dp)
                 )
 
-                LabeledField(
-                    label = "Sample ID",
-                    value = sampleId,
-                    onValueChange = { sampleId = it },
-                    modifier = Modifier.padding(top = 14.dp)
-                )
             }
         }
 
@@ -228,16 +221,14 @@ fun StartSessionScreen(
             text = "Start scan",
             enabled = canStart,
             onClick = {
-                // Start scan is disabled for a third sample; never crash if a tap gets through.
-                val number = sampleNo ?: return@PrimaryActionButton
                 onStartScan(
                     SessionInfo(
                         technicianName = technicianName.trim(),
                         season = normalizedSeason,
                         indexNumber = indexNumber.trim(),
                         selectionName = selectionName.trim(),
-                        sampleId = sampleId.trim(),
-                        sampleNo = number
+                        sampleId = sampleIdFor(normalizedSeason, indexNumber.trim(), 1),
+                        sampleNo = 1
                     )
                 )
             },
@@ -273,8 +264,7 @@ private fun LabeledField(
     onValueChange: (String) -> Unit,
     modifier: Modifier = Modifier,
     placeholder: String? = null,
-    error: String? = null,
-    info: String? = null
+    error: String? = null
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
         Text(
@@ -289,8 +279,7 @@ private fun LabeledField(
             singleLine = true,
             isError = error != null,
             placeholder = placeholder?.let { { Text(it, color = Neutral600) } },
-            supportingText = error?.let { { Text(it, color = ErrorRed) } }
-                ?: info?.let { { Text(it, color = Accent700) } },
+            supportingText = error?.let { { Text(it, color = ErrorRed) } },
             shape = RectangleShape,
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = AccentGreen,

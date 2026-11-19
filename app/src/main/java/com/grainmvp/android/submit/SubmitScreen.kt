@@ -88,6 +88,7 @@ fun SubmitScreen(
     onSubmitted: (SubmittedPhoto) -> Unit,
     onEndSession: () -> Unit,
     onAnotherPhoto: () -> Unit,
+    onSecondSample: (secondSession: SessionInfo) -> Unit,
     onAnotherSample: (nextSession: SessionInfo) -> Unit,
     // Called with everything needed to retry this submission later, once
     // the technician taps "Keep on device" on the Failure screen -- see
@@ -143,6 +144,7 @@ fun SubmitScreen(
                 confirmedGrainCount = keptCount,
                 average = if (currentState.response.isAccepted) sampleAverageFor(session, submittedPhotos) else null,
                 onAnotherPhoto = onAnotherPhoto,
+                onSecondSample = { onSecondSample(session.secondSample()) },
                 onAnotherSample = { onAnotherSample(session.nextSample()) },
                 onEndSession = onEndSession
             )

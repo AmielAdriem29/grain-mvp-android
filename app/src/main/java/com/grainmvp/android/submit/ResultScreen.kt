@@ -32,10 +32,12 @@ import com.grainmvp.android.ui.theme.SurfaceBg
 /**
  * Screen 08 (Result) of the GRANULAR field redesign. The grade is the
  * reason the technician is here, so it gets the whole plate (the green
- * [BlueprintFrame] below). "Take another photo of this sample" is the
- * main action: it goes back to Capture with the same sample; the backend
- * numbers it as the next replicate (-02, -03 ...) and auto-accepts the
- * sample once two photos are GOOD. "Take photo of another sample" opens
+ * [BlueprintFrame] below). After sample 1, "Take photo of sample 2 of 2"
+ * is the main action: it goes to Capture for sample 2 of the same entry.
+ * "Retake photo of sample N" goes back to Capture with the same sample;
+ * the backend numbers it as the next replicate (-02, -03 ...) and
+ * auto-accepts the sample once two photos are GOOD. After sample 2 the
+ * retake is the main action. "Take photo of another sample" opens
  * the Another sample form (Start Session without the technician) -- see
  * MainActivity. [weight] is shown only when it was measured; an estimated
  * weight is hidden so the estimation rule is not revealed.
@@ -50,6 +52,7 @@ fun ResultScreen(
     confirmedGrainCount: Int,
     average: SampleAverage?,
     onAnotherPhoto: () -> Unit,
+    onSecondSample: () -> Unit,
     onAnotherSample: () -> Unit,
     onEndSession: () -> Unit
 ) {
@@ -156,11 +159,25 @@ fun ResultScreen(
             }
         }
 
-        PrimaryActionButton(
-            text = "Take another photo of this sample",
-            onClick = onAnotherPhoto,
-            modifier = Modifier.fillMaxWidth().padding(top = 12.dp)
-        )
+        val retakeText = "Retake photo of sample ${session.sampleNo}"
+        if (session.sampleNo == 1) {
+            PrimaryActionButton(
+                text = "Take photo of sample 2 of 2",
+                onClick = onSecondSample,
+                modifier = Modifier.fillMaxWidth().padding(top = 12.dp)
+            )
+            SecondaryActionButton(
+                text = retakeText,
+                onClick = onAnotherPhoto,
+                modifier = Modifier.fillMaxWidth().padding(top = 10.dp)
+            )
+        } else {
+            PrimaryActionButton(
+                text = retakeText,
+                onClick = onAnotherPhoto,
+                modifier = Modifier.fillMaxWidth().padding(top = 12.dp)
+            )
+        }
         SecondaryActionButton(
             text = "Take photo of another sample",
             onClick = onAnotherSample,
