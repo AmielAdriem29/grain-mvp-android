@@ -22,13 +22,13 @@ private val SAMPLE_WEIGHT_GRAMS = BigDecimal("30")
 private val HUNDRED = BigDecimal("100")
 private const val ACCEPTED_PHOTOS_PER_SAMPLE = 2
 
-/** Grade for an immature percentage: Pr < 2.0, G1 <= 5, G2 <= 10, G3 <= 15, otherwise Not classified. */
+/** Grade for an immature percentage: Pr < 2.0, G1 <= 5, G2 <= 10, G3 <= 15, otherwise Not Classified (the backend's spelling). */
 fun gradeFor(percentage: BigDecimal): String = when {
     percentage < BigDecimal("2.0") -> "Pr"
     percentage <= BigDecimal("5.0") -> "G1"
     percentage <= BigDecimal("10.0") -> "G2"
     percentage <= BigDecimal("15.0") -> "G3"
-    else -> "Not classified"
+    else -> "Not Classified"
 }
 
 /**
