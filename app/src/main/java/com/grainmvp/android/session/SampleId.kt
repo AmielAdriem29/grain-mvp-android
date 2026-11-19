@@ -24,3 +24,10 @@ fun incrementSampleId(id: String): String {
     val incremented = (digits.toLong() + 1).toString().padStart(digits.length, '0')
     return prefix + incremented
 }
+
+/**
+ * The sample ID sent to the backend, generated instead of typed: season,
+ * index number and sample number, e.g. "2026WS-NCT-118-S1". The backend
+ * appends the photo number, giving labels like "2026WS-NCT-118-S1-02".
+ */
+fun sampleIdFor(season: String, indexNumber: String, sampleNo: Int): String = "$season-$indexNumber-S$sampleNo"

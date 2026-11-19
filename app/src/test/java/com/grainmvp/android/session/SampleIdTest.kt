@@ -40,4 +40,16 @@ class SampleIdTest {
         // Only a *trailing* digit run counts -- "S1-A" has no trailing digits.
         assertEquals("S1-A-2", incrementSampleId("S1-A"))
     }
+
+    // ---- sampleIdFor ----
+
+    @Test
+    fun `sample ID is season, index number and sample number`() {
+        assertEquals("2026WS-NCT-118-S1", sampleIdFor("2026WS", "NCT-118", 1))
+    }
+
+    @Test
+    fun `sample 2 of the same entry gets its own sample ID`() {
+        assertEquals("2026WS-NCT-118-S2", sampleIdFor("2026WS", "NCT-118", 2))
+    }
 }
