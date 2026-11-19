@@ -454,6 +454,41 @@ leaving the rest queued for next time.
 Not independently verified end-to-end against a real backend -- no
 Android SDK in this environment, same limitation as every phase above.
 
+## 2026-11 — AI Assumed grade: weight is optional
+
+The technician no longer has to type a weight before Confirm.
+
+- **Estimated weight.** With the weight field blank, Correction estimates
+  the weight from the kept boxes (not removed; added boxes count) in
+  `correction/CorrectionLogic.kt` (`keptGrainCount`, `resolveWeight`).
+  The per-box value is never shown in any screen: the estimated weight is
+  hidden on the grade card, Submit and Result. 1 to 3000 kept boxes can be
+  estimated; outside that range the technician must type a weight.
+- **Grade preview.** `correction/GradePreview.kt` asks the backend's
+  `GET /api/grade?weight=` and falls back to the same calculation on the
+  phone (`localGradePreview`) when the call fails. The card says
+  "Calculated on phone" in that case.
+- **Typed weight.** A typed weight overrides the estimate, is shown as
+  measured, and is sent with `manuallyOverridden = true`, so the backend
+  marks the photo GOOD. The "I verified this count manually" checkbox on
+  Submit is removed.
+- **Result.** Quality shows AI confidence only, Grains shows the kept count
+  only (the derived "of Y" total and `GrainCount.kt` are removed). Buttons:
+  "Take another photo of this sample" (main), "Take photo of another
+  sample", "End session".
+- **Sample number.** "Take photo of another sample" and "Keep on device"
+  open Start Session as the Another sample form, with the technician fixed.
+  `session/SessionInfo.kt`'s `sampleNoFor` sets the sample number from the
+  samples started since the last End session: the same season + index
+  number becomes sample 2, and a third sample is blocked. These entries are
+  in memory only, so after End session or an app restart the next sample of
+  an entry is sent as sample 1 (accepted known limit).
+- **Top grade spelling.** The phone now writes "Not Classified", the
+  backend's spelling.
+
+Unit tests cover the new logic (141 passing). The screens were not tested
+on a device in this change.
+
 ## Cross-cutting notes (apply to every phase)
 
 - **Single coordinate space.** Every `GrainBox` everywhere in this app
