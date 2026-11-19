@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -23,10 +24,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -55,6 +58,8 @@ import androidx.compose.ui.unit.sp
 import com.grainmvp.android.ImageSpec
 import com.grainmvp.android.network.GrainAction
 import com.grainmvp.android.network.GrainBox
+import com.grainmvp.android.submit.formatPercentage
+import com.grainmvp.android.ui.components.BlueprintFrame
 import com.grainmvp.android.ui.components.SecondaryActionButton
 import com.grainmvp.android.ui.components.PrimaryActionButton
 import com.grainmvp.android.ui.components.blueprintCorners
@@ -65,9 +70,13 @@ import com.grainmvp.android.ui.theme.DetectionBlue
 import com.grainmvp.android.ui.theme.DividerColor
 import com.grainmvp.android.ui.theme.ErrorRed
 import com.grainmvp.android.ui.theme.Neutral500
+import com.grainmvp.android.ui.theme.Neutral600
 import com.grainmvp.android.ui.theme.Neutral700
+import com.grainmvp.android.ui.theme.RiceGold
 import com.grainmvp.android.ui.theme.SurfaceBg
 import com.grainmvp.android.ui.theme.TextPrimaryGranular
+import kotlinx.coroutines.delay
+import kotlin.math.roundToInt
 
 /** Zoom range: 1x (fit-to-width, no zoom) up to 4x -- close enough to make
  *  individual grains easy to tap without losing track of where you are
@@ -77,6 +86,9 @@ private const val MAX_ZOOM = 4f
 
 /** Multiplier applied per tap of the floating +/- zoom buttons. */
 private const val ZOOM_STEP = 1.5f
+
+/** Wait after the last box or weight change before asking for a grade, so fast taps send one request. */
+private const val GRADE_PREVIEW_DEBOUNCE_MS = 300L
 
 /**
  * Screen 05 (Review & correct) of the GRANULAR field redesign.
@@ -102,6 +114,11 @@ private const val ZOOM_STEP = 1.5f
  *    pinch is the primary way to zoom. There's no separate floating
  *    mode toggle any more -- the segmented control is the only mode
  *    switch, so it isn't duplicated.
+ *  - an AI Assumed grade card: with the weight field blank, the weight is
+ *    estimated from the kept boxes ([resolveWeight]) and graded by
+ *    GET /api/grade, or on the phone when that fails ([gradePreview]).
+ *    A typed weight overrides the estimate and is sent as measured. The
+ *    estimated weight itself is never shown.
  */
 @SuppressLint("UnusedBoxWithConstraintsScope")
 @Composable
@@ -109,7 +126,7 @@ fun CorrectionScreen(
     image: Bitmap,
     initialGrains: List<GrainBox>,
     onRetakePhoto: () -> Unit,
-    onSubmit: (confirmedGrains: List<GrainBox>, weight: String) -> Unit
+    onSubmit: (confirmedGrains: List<GrainBox>, weight: ResolvedWeight) -> Unit
 ) {
     val grains = remember(initialGrains) {
         mutableStateListOf<GrainBox>().apply { addAll(initialGrains) }
@@ -125,7 +142,24 @@ fun CorrectionScreen(
     val aiCount = initialGrains.size
     val removedCount = grains.count { it.action == GrainAction.REMOVED }
     val addedCount = grains.count { it.action == GrainAction.ADDED }
-    val confirmedCount = grains.count { it.action != GrainAction.REMOVED }
+    val confirmedCount = keptGrainCount(grains)
+    val resolved = resolveWeight(weightText, confirmedCount)
+    val avgConfidence = remember(initialGrains) { averageConfidence(initialGrains) }
+
+    // The last grade shown; kept while a new one loads so the card doesn't flicker.
+    var preview by remember { mutableStateOf<GradePreview?>(null) }
+    var previewLoading by remember { mutableStateOf(false) }
+    // Keyed on resolved, so a box or weight change cancels the previous request.
+    LaunchedEffect(resolved) {
+        if (resolved == null) {
+            previewLoading = false
+            return@LaunchedEffect
+        }
+        previewLoading = true
+        delay(GRADE_PREVIEW_DEBOUNCE_MS)
+        preview = gradePreview(resolved.grams)
+        previewLoading = false
+    }
 
     fun applyTap(imageX: Float, imageY: Float) {
         val updated = applyGrainTap(grains, imageX, imageY, mode)
@@ -186,7 +220,7 @@ fun CorrectionScreen(
 
         // SRS CH-04 / CH-09: the boxes are not what the grade is computed from.
         Text(
-            "Boxes mark immature grains for the image record and training data. The grade comes from the weight.",
+            "The AI Assumed grade is estimated from the boxes. Type a measured weight to override it.",
             fontSize = 12.sp,
             color = Neutral700,
             modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 8.dp)
@@ -413,7 +447,7 @@ fun CorrectionScreen(
 
             Column(modifier = Modifier.width(170.dp)) {
                 Text(
-                    "Immature grain weight (g)",
+                    "Measured weight (g), optional",
                     fontSize = 11.sp,
                     color = Neutral700,
                     modifier = Modifier.padding(bottom = 4.dp)
@@ -443,6 +477,17 @@ fun CorrectionScreen(
             )
         }
 
+        GradeCard(
+            resolved = resolved,
+            preview = preview,
+            loading = previewLoading,
+            keptCount = confirmedCount,
+            avgConfidence = avgConfidence,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 20.dp, end = 20.dp, top = 12.dp)
+        )
+
         Spacer(modifier = Modifier.weight(1f))
 
         Row(
@@ -459,11 +504,74 @@ fun CorrectionScreen(
             )
             PrimaryActionButton(
                 text = "Confirm $confirmedCount",
-                enabled = isValidWeightValue(weightText),
-                onClick = { onSubmit(prepareGrainsForSubmission(grains), weightText) },
+                enabled = resolved != null,
+                onClick = { resolved?.let { onSubmit(prepareGrainsForSubmission(grains), it) } },
                 height = 52.dp,
                 modifier = Modifier.weight(1.4f)
             )
+        }
+    }
+}
+
+/**
+ * The grade for the current weight. [preview] may belong to the previous
+ * weight while [loading]; it is replaced when the new grade arrives. No
+ * weight line for an estimated weight: next to the box count it would
+ * reveal the estimation rule.
+ */
+@Composable
+private fun GradeCard(
+    resolved: ResolvedWeight?,
+    preview: GradePreview?,
+    loading: Boolean,
+    keptCount: Int,
+    avgConfidence: Double?,
+    modifier: Modifier = Modifier
+) {
+    BlueprintFrame(modifier = modifier, contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp)) {
+        if (resolved == null || preview == null) {
+            val message = when {
+                resolved != null -> "Calculating grade…"
+                keptCount > MAX_ESTIMATED_BOXES -> "Too many boxes to estimate. Type a measured weight."
+                else -> "Enter a weight"
+            }
+            Text(message, fontSize = 14.sp, color = Neutral700)
+            return@BlueprintFrame
+        }
+        val measured = resolved.source == WeightSource.MEASURED
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            Text(
+                preview.grade,
+                fontFamily = FontFamily.SansSerif,
+                fontWeight = FontWeight.Bold,
+                fontSize = if (preview.grade.length <= 3) 30.sp else 18.sp,
+                color = TextPrimaryGranular
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        if (measured) "MEASURED" else "AI ASSUMED",
+                        fontFamily = FontFamily.SansSerif,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 10.sp,
+                        letterSpacing = 1.2.sp,
+                        color = Color.White,
+                        modifier = Modifier
+                            .background(if (measured) AccentGreen else RiceGold)
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                    Text("${formatPercentage(preview.percentage)}% immature", fontSize = 13.sp, color = TextPrimaryGranular)
+                    if (loading) {
+                        CircularProgressIndicator(modifier = Modifier.size(12.dp), strokeWidth = 1.5.dp, color = Accent700)
+                    }
+                }
+                val details = buildList {
+                    if (measured) add("${resolved.grams} g · typed")
+                    add("Avg confidence ${avgConfidence?.let { "${(it * 100).roundToInt()}%" } ?: "—"}")
+                    if (!preview.fromServer) add("Calculated on phone")
+                }
+                Text(details.joinToString(" · "), fontSize = 11.sp, color = Neutral600, modifier = Modifier.padding(top = 4.dp))
+            }
         }
     }
 }

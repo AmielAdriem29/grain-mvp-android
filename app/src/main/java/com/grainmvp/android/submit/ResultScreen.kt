@@ -16,6 +16,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.grainmvp.android.correction.ResolvedWeight
+import com.grainmvp.android.correction.WeightSource
 import com.grainmvp.android.network.ReplicateResponse
 import com.grainmvp.android.session.SessionInfo
 import com.grainmvp.android.ui.components.BlueprintFrame
@@ -30,13 +32,13 @@ import com.grainmvp.android.ui.theme.SurfaceBg
 /**
  * Screen 08 (Result) of the GRANULAR field redesign. The grade is the
  * reason the technician is here, so it gets the whole plate (the green
- * [BlueprintFrame] below). "Add second sample" (only after sample 1)
- * goes straight back to Capture for sample 2 of the same entry.
- * "Next sample" returns to Start Session with the technician, season and
- * incremented sample ID (via [incrementSampleId]) prefilled -- see
- * MainActivity. "Take another photo of this sample" goes back to Capture
- * with the same sample; the backend numbers it as the next replicate
- * (-02, -03 ...) and auto-accepts the sample once two photos are GOOD.
+ * [BlueprintFrame] below). "Take another photo of this sample" is the
+ * main action: it goes back to Capture with the same sample; the backend
+ * numbers it as the next replicate (-02, -03 ...) and auto-accepts the
+ * sample once two photos are GOOD. "Take photo of another sample" opens
+ * the Another sample form (Start Session without the technician) -- see
+ * MainActivity. [weight] is shown only when it was measured; an estimated
+ * weight is hidden so the estimation rule is not revealed.
  * [average] is the sample's average when this photo completed it and this
  * phone holds both accepted photos (see SampleAverage.kt).
  */
@@ -44,26 +46,18 @@ import com.grainmvp.android.ui.theme.SurfaceBg
 fun ResultScreen(
     response: ReplicateResponse,
     session: SessionInfo,
-    weight: String,
+    weight: ResolvedWeight,
     confirmedGrainCount: Int,
-    manuallyOverridden: Boolean,
     average: SampleAverage?,
     onAnotherPhoto: () -> Unit,
-    onAddSecondSample: () -> Unit,
-    onNextSample: () -> Unit,
+    onAnotherSample: () -> Unit,
     onEndSession: () -> Unit
 ) {
-    // totalGrains is NOT returned by the backend -- it's derived exactly
-    // (not a guess) from percentage = immature/total * 100, i.e.
-    // total = immature / (percentage / 100). Worth a one-line comment
-    // since it's derived, not backend-supplied (see docs/IMPLEMENTATION.md).
-    val totalGrains = totalGrainCount(confirmedGrainCount, response.percentage)
-    val nextSampleId = session.nextSample().sampleId
-    // "Not classified" is far wider than "G1", so it gets a smaller size.
+    // "Not Classified" is far wider than "G1", so it gets a smaller size.
     val gradeFontSize = if (response.grade.length <= 3) 76.sp else 40.sp
     // Older backends send no label; fall back to the plain sample ID.
     val recordedLabel = response.replicateLabel.ifBlank { session.sampleId }
-    val quality = qualityLabel(response.quality, response.confidence, manuallyOverridden)
+    val quality = qualityLabel(response.confidence)
 
     Column(
         modifier = Modifier
@@ -141,11 +135,9 @@ fun ResultScreen(
             }
 
             Column(modifier = Modifier.padding(top = 20.dp)) {
-                quality?.let {
-                    SummaryRow("Quality", it)
-                    RowDivider()
-                }
-                SummaryRow("Grains", "$confirmedGrainCount of $totalGrains")
+                SummaryRow("Quality", quality)
+                RowDivider()
+                SummaryRow("Grains", confirmedGrainCount.toString())
                 RowDivider()
                 SummaryRow("Sample", "${session.sampleNo} of 2")
                 RowDivider()
@@ -156,29 +148,24 @@ fun ResultScreen(
                     )
                     RowDivider()
                 }
-                SummaryRow("Weight", "$weight g")
-                RowDivider()
+                if (weight.source == WeightSource.MEASURED) {
+                    SummaryRow("Weight", "${weight.grams} g", suffix = "(measured)")
+                    RowDivider()
+                }
                 SummaryRow("Technician", session.technicianName)
             }
         }
 
         PrimaryActionButton(
-            text = "Next sample · $nextSampleId",
-            onClick = onNextSample,
+            text = "Take another photo of this sample",
+            onClick = onAnotherPhoto,
             modifier = Modifier.fillMaxWidth().padding(top = 12.dp)
         )
         SecondaryActionButton(
-            text = "Take another photo of this sample",
-            onClick = onAnotherPhoto,
+            text = "Take photo of another sample",
+            onClick = onAnotherSample,
             modifier = Modifier.fillMaxWidth().padding(top = 10.dp)
         )
-        if (session.sampleNo == 1) {
-            SecondaryActionButton(
-                text = "Add second sample",
-                onClick = onAddSecondSample,
-                modifier = Modifier.fillMaxWidth().padding(top = 10.dp)
-            )
-        }
         SecondaryActionButton(
             text = "End session",
             onClick = onEndSession,

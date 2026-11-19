@@ -1,6 +1,5 @@
 package com.grainmvp.android.submit
 
-import com.grainmvp.android.network.ReplicateQuality
 import java.util.Locale
 import kotlin.math.roundToInt
 
@@ -8,22 +7,11 @@ import kotlin.math.roundToInt
 fun formatPercentage(percentage: Double): String = String.format(Locale.US, "%.1f", percentage)
 
 /**
- * The Quality row on Result, e.g. "GOOD · 86% confidence". Null when the
- * backend sent no quality (an older backend), so the row is hidden.
+ * The Quality row on Result: AI confidence only, e.g. "86% confidence".
+ * GOOD/BAD still drives auto-accept on the server but is not shown.
  */
-fun qualityLabel(quality: ReplicateQuality?, confidence: Double?, manuallyOverridden: Boolean): String? {
-    val verdict = when (quality) {
-        ReplicateQuality.GOOD -> "GOOD"
-        ReplicateQuality.BAD -> "BAD"
-        null -> return null
-    }
-    val detail = when {
-        manuallyOverridden -> "manually verified"
-        confidence == null -> "no AI confidence"
-        else -> "${(confidence * 100).roundToInt()}% confidence"
-    }
-    return "$verdict · $detail"
-}
+fun qualityLabel(confidence: Double?): String =
+    if (confidence == null) "No AI confidence" else "${(confidence * 100).roundToInt()}% confidence"
 
 /** Banner text once the backend auto-accepts the sample; without numbers when this phone can't compute them. */
 fun acceptedBannerText(average: SampleAverage?): String =

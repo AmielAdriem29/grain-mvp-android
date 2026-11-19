@@ -8,18 +8,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -27,17 +22,18 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.grainmvp.android.ImageSpec
+import com.grainmvp.android.correction.ResolvedWeight
+import com.grainmvp.android.correction.WeightSource
+import com.grainmvp.android.correction.keptGrainCount
 import com.grainmvp.android.network.GrainBox
 import com.grainmvp.android.network.ReplicateResponse
 import com.grainmvp.android.session.SessionInfo
@@ -66,6 +62,10 @@ import java.time.Instant
  * through Capture/Correction as a SessionInfo (see MainActivity's
  * Screen sealed class). By the time the technician reaches this screen,
  * it's a read-only confirmation of what will be sent, not a form.
+ *
+ * manuallyOverridden is sent true when the weight was measured (typed on
+ * Correction), so the backend marks the photo GOOD; an estimated weight
+ * leaves the verdict to AI confidence.
  */
 private sealed class SubmitState {
     data object Form : SubmitState()
@@ -81,15 +81,14 @@ fun SubmitScreen(
     image: Bitmap,
     aiPredictedGrains: List<GrainBox>,
     confirmedGrains: List<GrainBox>,
-    weight: String,
+    weight: ResolvedWeight,
     capturedAt: Instant,
     // Photos already sent this session; Result averages the sample's GOOD ones once accepted.
     submittedPhotos: List<SubmittedPhoto>,
     onSubmitted: (SubmittedPhoto) -> Unit,
     onEndSession: () -> Unit,
     onAnotherPhoto: () -> Unit,
-    onAddSecondSample: (secondSession: SessionInfo) -> Unit,
-    onNextSample: (nextSession: SessionInfo) -> Unit,
+    onAnotherSample: (nextSession: SessionInfo) -> Unit,
     // Called with everything needed to retry this submission later, once
     // the technician taps "Keep on device" on the Failure screen -- see
     // MainActivity's replicateQueue and ReplicateQueue.kt.
@@ -100,7 +99,7 @@ fun SubmitScreen(
     // Set once, on the first tap of Submit. A retry (Retry now, or from
     // the queue) re-sends this original value instead of a new time.
     var submittedAt by remember { mutableStateOf<Instant?>(null) }
-    var manuallyOverridden by remember { mutableStateOf(false) }
+    val keptCount = keptGrainCount(confirmedGrains)
 
     fun buildQueuedItem(): QueuedReplicate {
         val at = submittedAt ?: Instant.now().also { submittedAt = it }
@@ -109,8 +108,8 @@ fun SubmitScreen(
             session = session,
             aiPredictedGrains = aiPredictedGrains,
             confirmedGrains = confirmedGrains,
-            weight = weight,
-            manuallyOverridden = manuallyOverridden,
+            weight = weight.grams,
+            manuallyOverridden = weight.source == WeightSource.MEASURED,
             capturedAt = capturedAt,
             submittedAt = at
         )
@@ -122,7 +121,7 @@ fun SubmitScreen(
         scope.launch {
             try {
                 val response = submitQueuedReplicate(item)
-                onSubmitted(SubmittedPhoto(session, weight, response))
+                onSubmitted(SubmittedPhoto(session, weight.grams, response))
                 state = SubmitState.Success(response)
             } catch (e: Exception) {
                 // Broad catch is deliberate: connection refused, timeout,
@@ -141,12 +140,10 @@ fun SubmitScreen(
                 response = currentState.response,
                 session = session,
                 weight = weight,
-                confirmedGrainCount = confirmedGrains.size,
-                manuallyOverridden = manuallyOverridden,
+                confirmedGrainCount = keptCount,
                 average = if (currentState.response.isAccepted) sampleAverageFor(session, submittedPhotos) else null,
                 onAnotherPhoto = onAnotherPhoto,
-                onAddSecondSample = { onAddSecondSample(session.secondSample()) },
-                onNextSample = { onNextSample(session.nextSample()) },
+                onAnotherSample = { onAnotherSample(session.nextSample()) },
                 onEndSession = onEndSession
             )
         }
@@ -155,7 +152,7 @@ fun SubmitScreen(
                 exceptionClassName = currentState.exceptionClassName,
                 httpCode = currentState.httpCode,
                 sampleId = session.sampleId,
-                confirmedGrainCount = confirmedGrains.size,
+                confirmedGrainCount = keptCount,
                 onRetry = { submit() },
                 onKeepOnDevice = { onKeepOnDevice(buildQueuedItem()) }
             )
@@ -166,10 +163,8 @@ fun SubmitScreen(
                 weight = weight,
                 image = image,
                 aiCount = aiPredictedGrains.size,
-                confirmedCount = confirmedGrains.size,
+                confirmedCount = keptCount,
                 isLoading = currentState is SubmitState.Loading,
-                manuallyOverridden = manuallyOverridden,
-                onManuallyOverriddenChange = { manuallyOverridden = it },
                 onSubmit = { submit() }
             )
         }
@@ -179,13 +174,11 @@ fun SubmitScreen(
 @Composable
 private fun SubmitFormScreen(
     session: SessionInfo,
-    weight: String,
+    weight: ResolvedWeight,
     image: Bitmap,
     aiCount: Int,
     confirmedCount: Int,
     isLoading: Boolean,
-    manuallyOverridden: Boolean,
-    onManuallyOverriddenChange: (Boolean) -> Unit,
     onSubmit: () -> Unit
 ) {
     Column(
@@ -221,8 +214,11 @@ private fun SubmitFormScreen(
                 RowDivider()
                 SummaryRow("Sample ID", session.sampleId, suffix = "(${session.sampleNo} of 2)")
                 RowDivider()
-                SummaryRow("Weight", "$weight g")
-                RowDivider()
+                // An estimated weight is not shown: it would reveal the estimation rule.
+                if (weight.source == WeightSource.MEASURED) {
+                    SummaryRow("Weight", "${weight.grams} g", suffix = "(measured)")
+                    RowDivider()
+                }
                 SummaryRow("Confirmed grains", confirmedCount.toString(), suffix = "(AI $aiCount)")
             }
 
@@ -246,12 +242,6 @@ private fun SubmitFormScreen(
             }
         }
 
-        ManualOverrideToggle(
-            checked = manuallyOverridden,
-            enabled = !isLoading,
-            onCheckedChange = onManuallyOverriddenChange
-        )
-
         PrimaryActionButton(
             text = if (isLoading) "Submitting…" else "Submit replicate",
             loading = isLoading,
@@ -269,38 +259,6 @@ private fun SubmitFormScreen(
             color = Neutral600,
             textAlign = TextAlign.Center
         )
-    }
-}
-
-/**
- * "I verified this count manually": sent as manuallyOverridden, which makes
- * the backend mark the photo GOOD regardless of AI confidence. The whole row
- * is the touch target, not just the box.
- */
-@Composable
-private fun ManualOverrideToggle(checked: Boolean, enabled: Boolean, onCheckedChange: (Boolean) -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 12.dp)
-            .toggleable(value = checked, enabled = enabled, role = Role.Checkbox, onValueChange = onCheckedChange),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Checkbox(
-            checked = checked,
-            onCheckedChange = null,
-            enabled = enabled,
-            colors = CheckboxDefaults.colors(checkedColor = Accent700)
-        )
-        Spacer(modifier = Modifier.width(8.dp))
-        Column {
-            Text("I verified this count manually", fontSize = 15.sp, color = TextPrimaryGranular)
-            Text(
-                "Marks this photo GOOD regardless of AI confidence.",
-                fontSize = 12.sp,
-                color = Neutral600
-            )
-        }
     }
 }
 

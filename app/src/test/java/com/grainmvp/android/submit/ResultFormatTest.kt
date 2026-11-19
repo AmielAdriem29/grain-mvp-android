@@ -1,8 +1,7 @@
 package com.grainmvp.android.submit
 
-import com.grainmvp.android.network.ReplicateQuality
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
+import org.junit.Assert.assertFalse
 import org.junit.Test
 import java.math.BigDecimal
 
@@ -29,28 +28,26 @@ class ResultFormatTest {
 class QualityLabelTest {
 
     @Test
-    fun `good photo shows its confidence as a whole percent`() {
-        assertEquals("GOOD · 86% confidence", qualityLabel(ReplicateQuality.GOOD, 0.86, false))
+    fun `confidence is shown as a whole percent`() {
+        assertEquals("86% confidence", qualityLabel(0.86))
     }
 
     @Test
-    fun `bad photo shows its confidence`() {
-        assertEquals("BAD · 62% confidence", qualityLabel(ReplicateQuality.BAD, 0.62, false))
+    fun `confidence rounds to the nearest whole percent`() {
+        assertEquals("86% confidence", qualityLabel(0.855))
+        assertEquals("62% confidence", qualityLabel(0.6249))
     }
 
     @Test
-    fun `manual override wins over confidence`() {
-        assertEquals("GOOD · manually verified", qualityLabel(ReplicateQuality.GOOD, 0.40, true))
+    fun `GOOD or BAD is never shown`() {
+        val label = qualityLabel(0.40)
+        assertEquals("40% confidence", label)
+        assertFalse(label.contains("GOOD") || label.contains("BAD"))
     }
 
     @Test
     fun `missing confidence is said plainly`() {
-        assertEquals("BAD · no AI confidence", qualityLabel(ReplicateQuality.BAD, null, false))
-    }
-
-    @Test
-    fun `no quality from the backend hides the row`() {
-        assertNull(qualityLabel(null, 0.9, false))
+        assertEquals("No AI confidence", qualityLabel(null))
     }
 
     @Test

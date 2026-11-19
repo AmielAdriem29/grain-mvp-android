@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.sp
 import com.grainmvp.android.R
 import com.grainmvp.android.session.SessionInfo
 import com.grainmvp.android.session.isValidSeason
+import com.grainmvp.android.session.sampleNoFor
 import com.grainmvp.android.session.normalizeSeason
 import com.grainmvp.android.ui.components.BlueprintFrame
 import com.grainmvp.android.ui.components.PrimaryActionButton
@@ -61,12 +62,21 @@ import com.grainmvp.android.ui.theme.TextPrimaryGranular
  * `MainActivity`'s in-memory `replicateQueue` size, and [onSendQueued]
  * actually retries every queued submission (see `sendQueuedReplicates`
  * in MainActivity.kt). Documented in docs/IMPLEMENTATION.md.
+ *
+ * With [keepTechnician] (Result's "Take photo of another sample", or
+ * "Keep on device") the screen becomes the Another sample form: the
+ * technician is shown read-only and every other field is asked again.
+ * The sample number comes from [sampleNoFor] over [sessionEntries]: the
+ * same season + index number as a sample started this session becomes
+ * sample 2, and a third sample of an entry cannot be started.
  */
 @Composable
 fun StartSessionScreen(
     defaultTechnicianName: String,
     defaultSeason: String,
     defaultSampleId: String,
+    keepTechnician: Boolean,
+    sessionEntries: List<SessionInfo>,
     queuedCount: Int,
     onSendQueued: () -> Unit,
     onStartScan: (session: SessionInfo) -> Unit
@@ -83,7 +93,9 @@ fun StartSessionScreen(
     } else {
         null
     }
-    val canStart = technicianName.isNotBlank() &&
+    val sampleNo = sampleNoFor(normalizedSeason, indexNumber.trim(), sessionEntries)
+    val canStart = sampleNo != null &&
+            technicianName.isNotBlank() &&
             isValidSeason(normalizedSeason) &&
             indexNumber.isNotBlank() &&
             selectionName.isNotBlank() &&
@@ -123,7 +135,7 @@ fun StartSessionScreen(
 
             Column(modifier = Modifier.padding(top = 24.dp)) {
                 Text(
-                    "Rice grain quality assessment",
+                    if (keepTechnician) "Another sample" else "Rice grain quality assessment",
                     fontFamily = FontFamily.SansSerif,
                     fontWeight = FontWeight.Bold,
                     fontSize = 30.sp,
@@ -131,7 +143,8 @@ fun StartSessionScreen(
                     color = TextPrimaryGranular
                 )
                 Text(
-                    "Photograph a sample, correct the detection, submit the replicate.",
+                    if (keepTechnician) "Same technician. Enter the details of the next sample."
+                    else "Photograph a sample, correct the detection, submit the replicate.",
                     modifier = Modifier.padding(top = 8.dp),
                     fontSize = 14.sp,
                     color = Neutral700
@@ -148,7 +161,7 @@ fun StartSessionScreen(
                 )
             ) {
                 Text(
-                    "NEW SESSION",
+                    if (keepTechnician) "NEXT SAMPLE" else "NEW SESSION",
                     fontFamily = FontFamily.SansSerif,
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 11.sp,
@@ -156,12 +169,24 @@ fun StartSessionScreen(
                     color = Accent700
                 )
 
-                LabeledField(
-                    label = "Technician",
-                    value = technicianName,
-                    onValueChange = { technicianName = it },
-                    modifier = Modifier.padding(top = 14.dp)
-                )
+                if (keepTechnician) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 14.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("TECHNICIAN", fontSize = 12.sp, letterSpacing = 1.sp, color = Neutral700)
+                        Text(technicianName, fontSize = 16.sp, color = TextPrimaryGranular)
+                    }
+                } else {
+                    LabeledField(
+                        label = "Technician",
+                        value = technicianName,
+                        onValueChange = { technicianName = it },
+                        modifier = Modifier.padding(top = 14.dp)
+                    )
+                }
 
                 LabeledField(
                     label = "Season",
@@ -176,6 +201,8 @@ fun StartSessionScreen(
                     label = "Index No.",
                     value = indexNumber,
                     onValueChange = { indexNumber = it },
+                    info = if (indexNumber.isNotBlank() && sampleNo == 2) "Sample 2 of this entry" else null,
+                    error = if (indexNumber.isNotBlank() && sampleNo == null) "This entry already has 2 samples" else null,
                     modifier = Modifier.padding(top = 14.dp)
                 )
 
@@ -201,6 +228,8 @@ fun StartSessionScreen(
             text = "Start scan",
             enabled = canStart,
             onClick = {
+                // Start scan is disabled for a third sample; never crash if a tap gets through.
+                val number = sampleNo ?: return@PrimaryActionButton
                 onStartScan(
                     SessionInfo(
                         technicianName = technicianName.trim(),
@@ -208,7 +237,7 @@ fun StartSessionScreen(
                         indexNumber = indexNumber.trim(),
                         selectionName = selectionName.trim(),
                         sampleId = sampleId.trim(),
-                        sampleNo = 1
+                        sampleNo = number
                     )
                 )
             },
@@ -244,7 +273,8 @@ private fun LabeledField(
     onValueChange: (String) -> Unit,
     modifier: Modifier = Modifier,
     placeholder: String? = null,
-    error: String? = null
+    error: String? = null,
+    info: String? = null
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
         Text(
@@ -259,7 +289,8 @@ private fun LabeledField(
             singleLine = true,
             isError = error != null,
             placeholder = placeholder?.let { { Text(it, color = Neutral600) } },
-            supportingText = error?.let { { Text(it, color = ErrorRed) } },
+            supportingText = error?.let { { Text(it, color = ErrorRed) } }
+                ?: info?.let { { Text(it, color = Accent700) } },
             shape = RectangleShape,
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = AccentGreen,
