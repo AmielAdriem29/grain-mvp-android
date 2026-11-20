@@ -2,13 +2,15 @@ package com.grainmvp.android.network
 
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
+import retrofit2.http.GET
 import retrofit2.http.Multipart
 import retrofit2.http.POST
 import retrofit2.http.Part
+import retrofit2.http.Query
 
 /**
- * The two endpoints Android calls, in order, once per rice sample.
- * Nothing else — Android never talks to the database directly, and
+ * The three endpoints Android calls: predict and replicate, in order, once
+ * per photo, plus a grade preview while correcting. Nothing else — Android never talks to the database directly, and
  * never calls the dashboard's endpoints (GET /api/replicates, etc.).
  */
 interface ApiService {
@@ -38,4 +40,8 @@ interface ApiService {
         @Part("capturedAt") capturedAt: RequestBody,
         @Part("submittedAt") submittedAt: RequestBody
     ): ReplicateResponse
+
+    /** Grade for a weight in grams, without saving anything. */
+    @GET("api/grade")
+    suspend fun grade(@Query("weight") weight: String): GradeResponse
 }

@@ -49,7 +49,7 @@ class SampleAverageTest {
         assertEquals("G2", gradeFor(BigDecimal("10.0")))
         assertEquals("G3", gradeFor(BigDecimal("10.1")))
         assertEquals("G3", gradeFor(BigDecimal("15.0")))
-        assertEquals("Not classified", gradeFor(BigDecimal("15.1")))
+        assertEquals("Not Classified", gradeFor(BigDecimal("15.1")))
     }
 
     @Test

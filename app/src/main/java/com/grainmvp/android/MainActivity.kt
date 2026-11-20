@@ -29,6 +29,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.grainmvp.android.camera.CameraPreviewScreen
 import com.grainmvp.android.correction.CorrectionScreen
+import com.grainmvp.android.correction.ResolvedWeight
 import com.grainmvp.android.detect.DetectScreen
 import com.grainmvp.android.home.StartSessionScreen
 import com.grainmvp.android.home.WelcomeScreen
@@ -47,20 +48,27 @@ import java.time.Instant
  * Entry point. Screens are swapped in per phase branch; as of the
  * GRANULAR field redesign (2026-09), the flow is:
  *  - Welcome (opening splash)
- *  - Start Session (technician, season, index number, selection name and
- *    sample ID -- collected here, not on Submit)
+ *  - Start Session (technician, season, index number and selection name
+ *    -- collected here, not on Submit; the sample ID is generated from
+ *    season, index number and sample number)
  *  - Capture -> Detect -> Correction -> Submit, all carrying the same
  *    [SessionInfo], plus the time the photo was captured
- *  - Result's "Take another photo of this sample" goes back to Capture
+ *  - Correction grades an AI Assumed weight estimated from the kept boxes,
+ *    unless the technician types a measured weight; a measured weight is
+ *    sent with manuallyOverridden = true (correction/CorrectionLogic.kt)
+ *  - Result's "Retake photo of sample N" goes back to Capture
  *    with the same session; backend `dev` numbers it as the next
  *    replicate (-02, -03 ...) and auto-accepts the sample at two GOOD
  *    photos. Successful sends are kept in `submittedPhotos` so Result can
  *    show the sample's average (submit/SampleAverage.kt)
- *  - Result's "Add second sample" goes straight back to Capture for
- *    sample 2 of the same entry; "Next sample" returns to Start Session
- *    with technician, season and the next sample ID prefilled
+ *  - Result's "Take photo of sample 2 of 2" (after sample 1) goes straight
+ *    to Capture for sample 2 of the same entry
+ *  - Result's "Take photo of another sample" opens Start Session as the
+ *    Another sample form: technician fixed, season prefilled. An entry
+ *    already started this session (`sessionEntries`) is blocked there --
+ *    see isEntryInSession
  *  - A submission that fails to send can be "kept on device" from the
- *    Failure screen -- held in `replicateQueue` (in-memory only) and
+ *    Failure screen, which also opens the Another sample form -- held in `replicateQueue` (in-memory only) and
  *    retried manually from Start Session's "Send N queued" -- see
  *    submit/ReplicateQueue.kt and [sendQueuedReplicates] below
  *
@@ -69,7 +77,8 @@ import java.time.Instant
  */
 private sealed class Screen {
     data object Welcome : Screen()
-    data object StartSession : Screen()
+    /** [keepTechnician] makes it the Another sample form: technician fixed until End session. */
+    data class StartSession(val keepTechnician: Boolean = false) : Screen()
     data class Capture(val session: SessionInfo) : Screen()
     data class Detecting(val image: Bitmap, val session: SessionInfo, val capturedAt: Instant) :
         Screen()
@@ -85,7 +94,7 @@ private sealed class Screen {
         val image: Bitmap,
         val aiPredictedGrains: List<GrainBox>,
         val confirmedGrains: List<GrainBox>,
-        val weight: String,
+        val weight: ResolvedWeight,
         val session: SessionInfo,
         val capturedAt: Instant
     ) : Screen()
@@ -149,7 +158,6 @@ fun GrainMvpApp() {
     // technician name, per the redesign brief.
     var lastTechnicianName by remember { mutableStateOf("") }
     var lastSeason by remember { mutableStateOf("") }
-    var lastSampleId by remember { mutableStateOf("") }
 
     // Submissions that failed to send and are being held for a later
     // manual retry ("Keep on device" on the Failure screen) -- see
@@ -161,6 +169,9 @@ fun GrainMvpApp() {
     // Photos sent successfully this session, so Result can show a sample's
     // average once the backend auto-accepts it. In-memory, cleared on End session.
     val submittedPhotos = remember { mutableStateListOf<SubmittedPhoto>() }
+    // Samples started since the last End session, so Start Session can tell
+    // sample 1 from sample 2 of an entry. In-memory, cleared on End session.
+    val sessionEntries = remember { mutableStateListOf<SessionInfo>() }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
@@ -168,14 +179,15 @@ fun GrainMvpApp() {
         Surface(modifier = Modifier.fillMaxSize()) {
             when (val currentScreen = screen) {
                 is Screen.Welcome -> {
-                    WelcomeScreen(onStart = { screen = Screen.StartSession })
+                    WelcomeScreen(onStart = { screen = Screen.StartSession() })
                 }
 
                 is Screen.StartSession -> {
                     StartSessionScreen(
+                        keepTechnician = currentScreen.keepTechnician,
+                        sessionEntries = sessionEntries,
                         defaultTechnicianName = lastTechnicianName,
                         defaultSeason = lastSeason,
-                        defaultSampleId = lastSampleId,
                         queuedCount = replicateQueue.size,
                         onSendQueued = {
                             scope.launch { sendQueuedReplicates(context, replicateQueue, submittedPhotos) }
@@ -183,7 +195,7 @@ fun GrainMvpApp() {
                         onStartScan = { session ->
                             lastTechnicianName = session.technicianName
                             lastSeason = session.season
-                            lastSampleId = session.sampleId
+                            sessionEntries.add(session)
                             screen = Screen.Capture(session)
                         }
                     )
@@ -265,37 +277,36 @@ fun GrainMvpApp() {
                         submittedPhotos = submittedPhotos,
                         onSubmitted = { submittedPhotos.add(it) },
                         onEndSession = {
-                            lastSampleId = ""
                             submittedPhotos.clear()
+                            sessionEntries.clear()
                             screen = Screen.Welcome
                         },
                         onAnotherPhoto = {
                             // Same sample again: the backend numbers it as the next replicate.
                             screen = Screen.Capture(currentScreen.session)
                         },
-                        onAddSecondSample = { secondSession ->
+                        onSecondSample = { secondSession ->
                             // Same entry, sample 2: skip Start Session.
+                            sessionEntries.add(secondSession)
                             screen = Screen.Capture(secondSession)
                         },
-                        onNextSample = { nextSession ->
-                            // New entry: back to Start Session with technician,
-                            // season and the next sample ID prefilled. The
-                            // index number is entered again.
+                        onAnotherSample = { nextSession ->
+                            // Another sample form: technician fixed, season
+                            // prefilled. A new entry is entered; one already
+                            // in this session is blocked.
                             lastTechnicianName = nextSession.technicianName
                             lastSeason = nextSession.season
-                            lastSampleId = nextSession.sampleId
-                            screen = Screen.StartSession
+                            screen = Screen.StartSession(keepTechnician = true)
                         },
                         onKeepOnDevice = { queuedItem ->
                             replicateQueue.add(queuedItem)
                             // "...or keep scanning and send it later" (the
                             // Failure screen's own copy) follows the same
-                            // path as "Next sample".
+                            // path as "Take photo of another sample".
                             val nextSession = queuedItem.session.nextSample()
                             lastTechnicianName = nextSession.technicianName
                             lastSeason = nextSession.season
-                            lastSampleId = nextSession.sampleId
-                            screen = Screen.StartSession
+                            screen = Screen.StartSession(keepTechnician = true)
                         }
                     )
                 }

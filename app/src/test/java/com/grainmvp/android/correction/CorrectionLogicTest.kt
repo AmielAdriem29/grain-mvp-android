@@ -5,6 +5,7 @@ import com.grainmvp.android.network.GrainBox
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
+import java.util.Locale
 
 class CorrectionLogicTest {
 
@@ -414,5 +415,160 @@ class CorrectionLogicTest {
     @Test
     fun `clampPan leaves an in-range pan value untouched`() {
         assertEquals(100f, clampPan(pan = 100f, boxSizePx = 1000f, zoom = 2f), 0.01f)
+    }
+
+    // ---- keptGrainCount ----
+
+    private fun box(action: GrainAction?, confidence: Float? = 0.8f) =
+        GrainBox(x = 0, y = 0, width = 24, height = 24, confidence = confidence, action = action)
+
+    @Test
+    fun `keptGrainCount counts untouched, kept and added boxes`() {
+        val grains = listOf(box(null), box(GrainAction.KEPT), box(GrainAction.ADDED, confidence = null))
+
+        assertEquals(3, keptGrainCount(grains))
+    }
+
+    @Test
+    fun `keptGrainCount leaves out removed boxes`() {
+        val grains = listOf(box(null), box(GrainAction.REMOVED), box(GrainAction.REMOVED))
+
+        assertEquals(1, keptGrainCount(grains))
+    }
+
+    @Test
+    fun `keptGrainCount of no boxes is 0`() {
+        assertEquals(0, keptGrainCount(emptyList()))
+    }
+
+    // ---- estimatedWeight ----
+
+    @Test
+    fun `estimatedWeight is 0_01 g per box with two decimals`() {
+        assertEquals("0.00", estimatedWeight(0))
+        assertEquals("0.03", estimatedWeight(3))
+        assertEquals("0.47", estimatedWeight(47))
+        assertEquals("1.00", estimatedWeight(100))
+    }
+
+    @Test
+    fun `estimatedWeight of the largest box count is the 30 g limit`() {
+        assertEquals("30.00", estimatedWeight(MAX_ESTIMATED_BOXES))
+    }
+
+    @Test
+    fun `estimatedWeight always uses a dot, whatever the phone's locale`() {
+        val original = Locale.getDefault()
+        try {
+            Locale.setDefault(Locale.GERMANY)
+            assertEquals("0.47", estimatedWeight(47))
+        } finally {
+            Locale.setDefault(original)
+        }
+    }
+
+    // ---- normalizedWeight ----
+
+    @Test
+    fun `normalizedWeight drops trailing zeros`() {
+        assertEquals("12.45", normalizedWeight("12.450"))
+        assertEquals("0.5", normalizedWeight("0.50"))
+    }
+
+    @Test
+    fun `normalizedWeight keeps whole numbers whole`() {
+        assertEquals("30", normalizedWeight("30"))
+        assertEquals("10", normalizedWeight("10.00"))
+    }
+
+    @Test
+    fun `normalizedWeight writes out exponent notation`() {
+        assertEquals("10", normalizedWeight("1e1"))
+        assertEquals("0.25", normalizedWeight("2.5E-1"))
+    }
+
+    @Test
+    fun `normalizedWeight drops leading zeros and adds one before a bare decimal point`() {
+        assertEquals("7.5", normalizedWeight("007.5"))
+        assertEquals("0.5", normalizedWeight(".5"))
+    }
+
+    // ---- resolveWeight ----
+
+    @Test
+    fun `a valid typed weight is measured and wins over the boxes`() {
+        assertEquals(ResolvedWeight("12.45", WeightSource.MEASURED), resolveWeight("12.45", keptBoxes = 47))
+    }
+
+    @Test
+    fun `a valid typed weight works with no boxes`() {
+        assertEquals(ResolvedWeight("3", WeightSource.MEASURED), resolveWeight("3", keptBoxes = 0))
+    }
+
+    @Test
+    fun `a typed weight is sent normalized`() {
+        assertEquals(ResolvedWeight("12.45", WeightSource.MEASURED), resolveWeight("12.450", keptBoxes = 0))
+        assertEquals(ResolvedWeight("10", WeightSource.MEASURED), resolveWeight("1e1", keptBoxes = 0))
+    }
+
+    @Test
+    fun `a blank field with boxes gives an estimated weight`() {
+        assertEquals(ResolvedWeight("0.47", WeightSource.ESTIMATED), resolveWeight("", keptBoxes = 47))
+    }
+
+    @Test
+    fun `a field of only spaces counts as blank`() {
+        assertEquals(ResolvedWeight("0.05", WeightSource.ESTIMATED), resolveWeight("   ", keptBoxes = 5))
+    }
+
+    @Test
+    fun `a blank field with one box and with the largest box count both estimate`() {
+        assertEquals(ResolvedWeight("0.01", WeightSource.ESTIMATED), resolveWeight("", keptBoxes = 1))
+        assertEquals(ResolvedWeight("30.00", WeightSource.ESTIMATED), resolveWeight("", keptBoxes = MAX_ESTIMATED_BOXES))
+    }
+
+    @Test
+    fun `a blank field with no boxes gives no weight`() {
+        assertNull(resolveWeight("", keptBoxes = 0))
+    }
+
+    @Test
+    fun `a blank field with too many boxes to estimate gives no weight`() {
+        assertNull(resolveWeight("", keptBoxes = MAX_ESTIMATED_BOXES + 1))
+    }
+
+    @Test
+    fun `a typed comma decimal gives no weight, even with boxes`() {
+        assertNull(resolveWeight("0,5", keptBoxes = 47))
+    }
+
+    @Test
+    fun `an invalid typed weight gives no weight instead of falling back to the estimate`() {
+        assertNull(resolveWeight("abc", keptBoxes = 47))
+        assertNull(resolveWeight("0", keptBoxes = 47))
+        assertNull(resolveWeight("30.01", keptBoxes = 47))
+        assertNull(resolveWeight("-1", keptBoxes = 47))
+    }
+
+    // ---- averageConfidence ----
+
+    @Test
+    fun `averageConfidence is the mean of the boxes that have one`() {
+        val grains = listOf(box(null, 0.8f), box(null, 0.9f), box(GrainAction.ADDED, confidence = null))
+
+        assertEquals(0.85, averageConfidence(grains)!!, 1e-6)
+    }
+
+    @Test
+    fun `averageConfidence still counts AI boxes the technician removed, like the backend`() {
+        val grains = listOf(box(null, 0.9f), box(GrainAction.REMOVED, 0.5f))
+
+        assertEquals(0.7, averageConfidence(grains)!!, 1e-6)
+    }
+
+    @Test
+    fun `averageConfidence is null when no box has a confidence`() {
+        assertNull(averageConfidence(emptyList()))
+        assertNull(averageConfidence(listOf(box(GrainAction.ADDED, confidence = null))))
     }
 }
