@@ -29,9 +29,17 @@ data class SessionInfo(
         sampleNo = 1
     )
 
-    /** The second sample of the same entry: same entry details, next sample ID, sample number 2. */
+    /** The second sample of the same entry: same entry details, sample number 2 and its generated sample ID. */
     fun secondSample(): SessionInfo = copy(
-        sampleId = incrementSampleId(sampleId),
+        sampleId = sampleIdFor(season, indexNumber, 2),
         sampleNo = 2
     )
 }
+
+/**
+ * Whether an entry (season + index number, exact match like the backend
+ * grouping) already has a sample started this session. The Another sample
+ * form blocks it: sample 2 is started from Result, never by retyping.
+ */
+fun isEntryInSession(season: String, indexNumber: String, started: List<SessionInfo>): Boolean =
+    started.any { it.season == season && it.indexNumber == indexNumber }

@@ -454,6 +454,46 @@ leaving the rest queued for next time.
 Not independently verified end-to-end against a real backend -- no
 Android SDK in this environment, same limitation as every phase above.
 
+## 2026-11 — AI Assumed grade: weight is optional
+
+The technician no longer has to type a weight before Confirm.
+
+- **Estimated weight.** With the weight field blank, Correction estimates
+  the weight from the kept boxes (not removed; added boxes count) in
+  `correction/CorrectionLogic.kt` (`keptGrainCount`, `resolveWeight`).
+  The per-box value is never shown in any screen: the estimated weight is
+  hidden on the grade card, Submit and Result. 1 to 3000 kept boxes can be
+  estimated; outside that range the technician must type a weight.
+- **Grade preview.** `correction/GradePreview.kt` asks the backend's
+  `GET /api/grade?weight=` and falls back to the same calculation on the
+  phone (`localGradePreview`) when the call fails. The card says
+  "Calculated on phone" in that case.
+- **Typed weight.** A typed weight overrides the estimate, is shown as
+  measured, and is sent with `manuallyOverridden = true`, so the backend
+  marks the photo GOOD. The "I verified this count manually" checkbox on
+  Submit is removed.
+- **Result.** Quality shows AI confidence only, Grains shows the kept count
+  only (the derived "of Y" total and `GrainCount.kt` are removed). Buttons
+  after sample 1: "Take photo of sample 2 of 2" (main), "Retake photo of
+  sample 1", "Take photo of another sample", "End session". After sample 2:
+  "Retake photo of sample 2" (main), "Take photo of another sample", "End
+  session". A retake adds another photo; it does not replace one.
+- **Samples.** Sample 2 of an entry is started only from Result. "Take
+  photo of another sample" and "Keep on device" open Start Session as the
+  Another sample form, with the technician fixed; it always starts sample 1
+  and blocks an entry (season + index number) already started this session
+  (`isEntryInSession` in `session/SessionInfo.kt`). These entries are in
+  memory only, so after End session or an app restart the same entry can
+  be started again as sample 1 (accepted known limit).
+- **Sample ID.** No longer typed. It is generated as
+  `{season}-{index number}-S{sample number}`, e.g. `2026WS-NCT-118-S1`
+  (`sampleIdFor` in `session/SampleId.kt`).
+- **Top grade spelling.** The phone now writes "Not Classified", the
+  backend's spelling.
+
+Unit tests cover the new logic (142 passing). The screens were not tested
+on a device in this change.
+
 ## Cross-cutting notes (apply to every phase)
 
 - **Single coordinate space.** Every `GrainBox` everywhere in this app

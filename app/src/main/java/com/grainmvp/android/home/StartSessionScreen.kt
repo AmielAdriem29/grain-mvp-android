@@ -33,6 +33,8 @@ import androidx.compose.ui.unit.sp
 import com.grainmvp.android.R
 import com.grainmvp.android.session.SessionInfo
 import com.grainmvp.android.session.isValidSeason
+import com.grainmvp.android.session.sampleIdFor
+import com.grainmvp.android.session.isEntryInSession
 import com.grainmvp.android.session.normalizeSeason
 import com.grainmvp.android.ui.components.BlueprintFrame
 import com.grainmvp.android.ui.components.PrimaryActionButton
@@ -50,7 +52,7 @@ import com.grainmvp.android.ui.theme.TextPrimaryGranular
  * Screen 02 (Start session) of the GRANULAR field redesign.
  *
  * The substantive change this screen exists for: technician name and
- * sample ID are asked here, right after the opening splash, instead of
+ * entry details are asked here, right after the opening splash, instead of
  * on the old Submit screen. By the time the technician reaches Submit
  * (submit/SubmitScreen.kt), it's a read-only confirmation of these two
  * values, not a form -- see MainActivity's Screen.StartSession wiring.
@@ -61,12 +63,22 @@ import com.grainmvp.android.ui.theme.TextPrimaryGranular
  * `MainActivity`'s in-memory `replicateQueue` size, and [onSendQueued]
  * actually retries every queued submission (see `sendQueuedReplicates`
  * in MainActivity.kt). Documented in docs/IMPLEMENTATION.md.
+ *
+ * With [keepTechnician] (Result's "Take photo of another sample", or
+ * "Keep on device") the screen becomes the Another sample form: the
+ * technician is shown read-only and every other field is asked again.
+ * This screen always starts sample 1. An entry (season + index number)
+ * already in [sessionEntries] is blocked ([isEntryInSession]): its sample 2
+ * is started from Result's "Take photo of sample 2 of 2". The sample ID is
+ * not typed: it is generated from season, index number and sample number
+ * ([sampleIdFor]).
  */
 @Composable
 fun StartSessionScreen(
     defaultTechnicianName: String,
     defaultSeason: String,
-    defaultSampleId: String,
+    keepTechnician: Boolean,
+    sessionEntries: List<SessionInfo>,
     queuedCount: Int,
     onSendQueued: () -> Unit,
     onStartScan: (session: SessionInfo) -> Unit
@@ -75,7 +87,6 @@ fun StartSessionScreen(
     var season by remember { mutableStateOf(defaultSeason) }
     var indexNumber by remember { mutableStateOf("") }
     var selectionName by remember { mutableStateOf("") }
-    var sampleId by remember { mutableStateOf(defaultSampleId) }
 
     val normalizedSeason = normalizeSeason(season)
     val seasonError = if (season.isNotBlank() && !isValidSeason(normalizedSeason)) {
@@ -83,11 +94,12 @@ fun StartSessionScreen(
     } else {
         null
     }
-    val canStart = technicianName.isNotBlank() &&
+    val entryInSession = isEntryInSession(normalizedSeason, indexNumber.trim(), sessionEntries)
+    val canStart = !entryInSession &&
+            technicianName.isNotBlank() &&
             isValidSeason(normalizedSeason) &&
             indexNumber.isNotBlank() &&
-            selectionName.isNotBlank() &&
-            sampleId.isNotBlank()
+            selectionName.isNotBlank()
 
     Column(
         modifier = Modifier
@@ -95,7 +107,7 @@ fun StartSessionScreen(
             .background(SurfaceBg)
             .padding(24.dp)
     ) {
-        // The form scrolls so the five fields and the on-screen keyboard
+        // The form scrolls so the fields and the on-screen keyboard
         // fit on small phones; the Start button below stays pinned.
         Column(
             modifier = Modifier
@@ -123,7 +135,7 @@ fun StartSessionScreen(
 
             Column(modifier = Modifier.padding(top = 24.dp)) {
                 Text(
-                    "Rice grain quality assessment",
+                    if (keepTechnician) "Another sample" else "Rice grain quality assessment",
                     fontFamily = FontFamily.SansSerif,
                     fontWeight = FontWeight.Bold,
                     fontSize = 30.sp,
@@ -131,7 +143,8 @@ fun StartSessionScreen(
                     color = TextPrimaryGranular
                 )
                 Text(
-                    "Photograph a sample, correct the detection, submit the replicate.",
+                    if (keepTechnician) "Same technician. Enter the details of the next sample."
+                    else "Photograph a sample, correct the detection, submit the replicate.",
                     modifier = Modifier.padding(top = 8.dp),
                     fontSize = 14.sp,
                     color = Neutral700
@@ -148,7 +161,7 @@ fun StartSessionScreen(
                 )
             ) {
                 Text(
-                    "NEW SESSION",
+                    if (keepTechnician) "NEXT SAMPLE" else "NEW SESSION",
                     fontFamily = FontFamily.SansSerif,
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 11.sp,
@@ -156,12 +169,24 @@ fun StartSessionScreen(
                     color = Accent700
                 )
 
-                LabeledField(
-                    label = "Technician",
-                    value = technicianName,
-                    onValueChange = { technicianName = it },
-                    modifier = Modifier.padding(top = 14.dp)
-                )
+                if (keepTechnician) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 14.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("TECHNICIAN", fontSize = 12.sp, letterSpacing = 1.sp, color = Neutral700)
+                        Text(technicianName, fontSize = 16.sp, color = TextPrimaryGranular)
+                    }
+                } else {
+                    LabeledField(
+                        label = "Technician",
+                        value = technicianName,
+                        onValueChange = { technicianName = it },
+                        modifier = Modifier.padding(top = 14.dp)
+                    )
+                }
 
                 LabeledField(
                     label = "Season",
@@ -176,6 +201,7 @@ fun StartSessionScreen(
                     label = "Index No.",
                     value = indexNumber,
                     onValueChange = { indexNumber = it },
+                    error = if (indexNumber.isNotBlank() && entryInSession) "This entry is already in this session" else null,
                     modifier = Modifier.padding(top = 14.dp)
                 )
 
@@ -186,12 +212,6 @@ fun StartSessionScreen(
                     modifier = Modifier.padding(top = 14.dp)
                 )
 
-                LabeledField(
-                    label = "Sample ID",
-                    value = sampleId,
-                    onValueChange = { sampleId = it },
-                    modifier = Modifier.padding(top = 14.dp)
-                )
             }
         }
 
@@ -207,7 +227,7 @@ fun StartSessionScreen(
                         season = normalizedSeason,
                         indexNumber = indexNumber.trim(),
                         selectionName = selectionName.trim(),
-                        sampleId = sampleId.trim(),
+                        sampleId = sampleIdFor(normalizedSeason, indexNumber.trim(), 1),
                         sampleNo = 1
                     )
                 )

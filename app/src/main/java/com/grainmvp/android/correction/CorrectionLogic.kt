@@ -2,6 +2,7 @@ package com.grainmvp.android.correction
 
 import com.grainmvp.android.network.GrainAction
 import com.grainmvp.android.network.GrainBox
+import java.math.BigDecimal
 
 /**
  * Fixed size for a newly added box, per SPEC.md.
@@ -84,6 +85,43 @@ fun isValidWeightValue(value: String): Boolean {
     val parsed = value.toDoubleOrNull() ?: return false
     return parsed > 0 && parsed <= MAX_WEIGHT_GRAMS
 }
+
+/** Estimated weight per kept box, in grams. Never shown to the technician. */
+private val GRAIN_WEIGHT_GRAMS = BigDecimal("0.01")
+
+/** Largest box count that can be estimated: 3000 x 0.01 g = 30 g, the backend limit. */
+const val MAX_ESTIMATED_BOXES = 3000
+
+/** Where the weight to grade and submit came from. */
+enum class WeightSource { ESTIMATED, MEASURED }
+
+/** The weight to grade and submit, in grams written with a dot, and where it came from. */
+data class ResolvedWeight(val grams: String, val source: WeightSource)
+
+/** Boxes the technician kept: everything not marked removed (added boxes count). */
+fun keptGrainCount(grains: List<GrainBox>): Int = grains.count { it.action != GrainAction.REMOVED }
+
+/** 0.01 g per box, exact, always written with a dot ("0.47"). */
+fun estimatedWeight(boxCount: Int): String =
+    GRAIN_WEIGHT_GRAMS.multiply(BigDecimal(boxCount)).setScale(2).toPlainString()
+
+/** A valid typed weight, normalized to a dot with no exponent ("1e1" -> "10"). */
+fun normalizedWeight(value: String): String = BigDecimal(value).stripTrailingZeros().toPlainString()
+
+/**
+ * The weight to grade and submit: a valid typed weight wins (MEASURED); with the field blank,
+ * 1..3000 kept boxes give an estimate (ESTIMATED); otherwise null and Confirm stays disabled.
+ */
+fun resolveWeight(typed: String, keptBoxes: Int): ResolvedWeight? = when {
+    isValidWeightValue(typed) -> ResolvedWeight(normalizedWeight(typed), WeightSource.MEASURED)
+    typed.isBlank() && keptBoxes in 1..MAX_ESTIMATED_BOXES ->
+        ResolvedWeight(estimatedWeight(keptBoxes), WeightSource.ESTIMATED)
+    else -> null
+}
+
+/** Mean AI confidence (0..1) of the predicted boxes, null when none have one. Matches the backend. */
+fun averageConfidence(grains: List<GrainBox>): Double? =
+    grains.mapNotNull { it.confidence?.toDouble() }.takeIf { it.isNotEmpty() }?.average()
 
 /**
  * Screen 05 (Review & correct) of the GRANULAR field redesign replaces

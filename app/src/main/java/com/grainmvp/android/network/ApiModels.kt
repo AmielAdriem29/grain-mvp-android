@@ -82,3 +82,12 @@ data class ReplicateResponse(
 ) {
     val isAccepted: Boolean get() = reviewStatus == "accepted"
 }
+
+/** Response shape from GET /api/grade. Preview only: nothing is saved. */
+@Serializable
+data class GradeResponse(
+    val weight: Double,
+    val percentage: Double,
+    val grade: String,
+    val meetsRecommendedValue: Boolean? = null
+)
